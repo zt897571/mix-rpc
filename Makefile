@@ -21,5 +21,5 @@ test:
 clean_win:
 	if exist erlang/_build/ (rd /s /q erlang\_build\)
 
-.PHONY: erlang golang proto test clean_win3
+.PHONY: erlang golang proto test clean_win
 

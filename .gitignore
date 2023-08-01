@@ -1,3 +1,4 @@
 *.pdf
-_build
 .idea
+bin
+rebar.lock
