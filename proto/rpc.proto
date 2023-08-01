@@ -1,0 +1,16 @@
+syntax = "proto3";
+package xgame;
+
+message req_message {
+  int32 seq = 1;   // 序列号
+  string source = 2;  // 调用方
+  string target = 3;  // 目标对象
+  bytes payload = 4;  // 具体协议内容
+}
+
+message reply_message {
+  int32 seq = 1;
+  string target = 2;
+  bytes payload = 3;
+  int32 err_code = 4;
+}
