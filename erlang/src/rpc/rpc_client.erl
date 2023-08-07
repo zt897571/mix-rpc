@@ -81,7 +81,7 @@ handle_info({tcp, _, Data}, State = #state{wait_map = WaitMap, socket = Socket})
     false ->
       %% 回复消息
       %%todo:zhangtuo 考虑spawn出进程处理
-      Msg = rpc_pb:decode_msg(iolist_to_binary(BinData), reply_message),
+      Msg = rpc_pb:decode_msg(BinData, reply_message),
       case maps:get(Msg#reply_message.seq, WaitMap, undefined) of
         undefined ->
           io:format("seq = ~p not found waitMap = ~p", [Msg#reply_message.seq, WaitMap]);

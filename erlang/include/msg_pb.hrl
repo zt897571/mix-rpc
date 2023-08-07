@@ -11,7 +11,8 @@
 -define('TEST_MSG_PB_H', true).
 -record(test_msg,
         {msg = []               :: unicode:chardata() | undefined, % = 1, optional
-         delayTime = 0          :: integer() | undefined % = 2, optional, 32 bits
+         delayTime = 0          :: integer() | undefined, % = 2, optional, 32 bits
+         rand = 0               :: integer() | undefined % = 3, optional, 32 bits
         }).
 -endif.
 

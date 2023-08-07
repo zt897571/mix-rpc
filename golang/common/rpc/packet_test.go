@@ -1,12 +1,14 @@
-// Package packet -----------------------------
+// Package rpc -----------------------------
 // @file      : packet_test.go
 // @author    : zhangtuo
 // @contact   :
 // @time      : 2023/7/31 10:25
 // -------------------------------------------
-package packet
+package rpc
 
-import "testing"
+import (
+	"testing"
+)
 import . "github.com/smartystreets/goconvey/convey"
 
 func TestPacket(t *testing.T) {

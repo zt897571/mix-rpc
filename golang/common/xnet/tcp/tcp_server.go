@@ -10,35 +10,36 @@ package tcp
 import (
 	"context"
 	"golang/common/log"
+	iface2 "golang/common/xnet/iface"
 	"net"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"syscall"
 )
 
 type Server struct {
-	cancelFunc      context.CancelFunc
 	start           int32
 	listen          net.Listener
-	connectionMap   sync.Map
-	connctionOption []ConnectionOption
-	connConfig      *ConnectionConfig
+	connctionOption []iface2.ConnectionOption
+	connConfig      *iface2.ConnectionConfig
 	port            int
+	handler         iface2.INewConnection
 }
 
-func NewServer(port int, connConfig *ConnectionConfig) *Server {
+var _ iface2.IServer = (*Server)(nil)
+
+func NewServer(port int, connConfig *iface2.ConnectionConfig) *Server {
 	return &Server{
 		connConfig: connConfig,
 		port:       port,
 	}
 }
 
-func (s *Server) Start(option ...ConnectionOption) {
-	if atomic.LoadInt32(&s.start) == 1 {
+func (s *Server) Start(handler iface2.INewConnection) {
+	if atomic.LoadInt32(&s.start) == 1 || handler == nil {
 		return
 	}
-	s.connctionOption = option
+	s.handler = handler
 	hostPort := net.JoinHostPort("", strconv.Itoa(s.port))
 	ls := net.ListenConfig{
 		// 重用端口
@@ -59,39 +60,35 @@ func (s *Server) Start(option ...ConnectionOption) {
 	}
 	s.listen = listen
 	func() {
-		defer func() {
-			s.close()
-		}()
+		defer s.onClose()
 		atomic.StoreInt32(&s.start, 1)
 		for {
 			conn, err := listen.Accept()
 			if err != nil {
 				return
 			}
-			go s.handleConnection(conn)
+			s.handleConnection(conn)
 		}
 	}()
 }
 
+func (s *Server) SetConnectionOpt(option ...iface2.ConnectionOption) {
+	s.connctionOption = option
+}
+
 func (s *Server) handleConnection(conn net.Conn) {
-	ci := NewConnectionInfo(conn, s.connConfig, s.connctionOption...)
-	ip := ci.GetIp()
-	s.connectionMap.Store(ip, ci)
-	ci.Run()
-	s.connectionMap.Delete(ip)
+	ci := NewConnectionInfo(conn, s.connConfig)
+	s.handler.OnNewConnection(ci)
 }
 
 func (s *Server) Stop() {
 	if atomic.LoadInt32(&s.start) != 1 {
 		return
 	}
-	s.close()
+	s.onClose()
 }
 
-func (s *Server) close() {
+func (s *Server) onClose() {
 	_ = s.listen.Close()
 	atomic.StoreInt32(&s.start, 0)
-}
-
-func (s *Server) GetConnection() {
 }

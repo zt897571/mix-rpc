@@ -26,10 +26,11 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type ReqMessage struct {
-	Seq     int32  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	Seq     uint32 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
 	Source  string `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
 	Target  string `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
-	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	MsgName string `protobuf:"bytes,4,opt,name=msgName,proto3" json:"msgName,omitempty"`
+	Payload []byte `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 }
 
 func (m *ReqMessage) Reset()      { *m = ReqMessage{} }
@@ -64,7 +65,7 @@ func (m *ReqMessage) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ReqMessage proto.InternalMessageInfo
 
-func (m *ReqMessage) GetSeq() int32 {
+func (m *ReqMessage) GetSeq() uint32 {
 	if m != nil {
 		return m.Seq
 	}
@@ -85,6 +86,13 @@ func (m *ReqMessage) GetTarget() string {
 	return ""
 }
 
+func (m *ReqMessage) GetMsgName() string {
+	if m != nil {
+		return m.MsgName
+	}
+	return ""
+}
+
 func (m *ReqMessage) GetPayload() []byte {
 	if m != nil {
 		return m.Payload
@@ -93,10 +101,11 @@ func (m *ReqMessage) GetPayload() []byte {
 }
 
 type ReplyMessage struct {
-	Seq     int32  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	Seq     uint32 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
 	Target  string `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
-	Payload []byte `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	ErrCode int32  `protobuf:"varint,4,opt,name=err_code,json=errCode,proto3" json:"err_code,omitempty"`
+	MsgName string `protobuf:"bytes,3,opt,name=msgName,proto3" json:"msgName,omitempty"`
+	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	ErrCode string `protobuf:"bytes,5,opt,name=err_code,json=errCode,proto3" json:"err_code,omitempty"`
 }
 
 func (m *ReplyMessage) Reset()      { *m = ReplyMessage{} }
@@ -131,7 +140,7 @@ func (m *ReplyMessage) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ReplyMessage proto.InternalMessageInfo
 
-func (m *ReplyMessage) GetSeq() int32 {
+func (m *ReplyMessage) GetSeq() uint32 {
 	if m != nil {
 		return m.Seq
 	}
@@ -145,6 +154,13 @@ func (m *ReplyMessage) GetTarget() string {
 	return ""
 }
 
+func (m *ReplyMessage) GetMsgName() string {
+	if m != nil {
+		return m.MsgName
+	}
+	return ""
+}
+
 func (m *ReplyMessage) GetPayload() []byte {
 	if m != nil {
 		return m.Payload
@@ -152,11 +168,11 @@ func (m *ReplyMessage) GetPayload() []byte {
 	return nil
 }
 
-func (m *ReplyMessage) GetErrCode() int32 {
+func (m *ReplyMessage) GetErrCode() string {
 	if m != nil {
 		return m.ErrCode
 	}
-	return 0
+	return ""
 }
 
 func init() {
@@ -167,22 +183,23 @@ func init() {
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor_77a6da22d6a3feb1) }
 
 var fileDescriptor_77a6da22d6a3feb1 = []byte{
-	// 232 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2c, 0x2a, 0x48, 0xd6,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0xad, 0x48, 0x4f, 0xcc, 0x4d, 0x55, 0xca, 0xe4, 0xe2,
-	0x2e, 0x4a, 0x2d, 0x8c, 0xcf, 0x4d, 0x2d, 0x2e, 0x4e, 0x4c, 0x4f, 0x15, 0x12, 0xe0, 0x62, 0x2e,
-	0x4e, 0x2d, 0x94, 0x60, 0x54, 0x60, 0xd4, 0x60, 0x0d, 0x02, 0x31, 0x85, 0xc4, 0xb8, 0xd8, 0x8a,
-	0xf3, 0x4b, 0x8b, 0x92, 0x53, 0x25, 0x98, 0x14, 0x18, 0x35, 0x38, 0x83, 0xa0, 0x3c, 0x90, 0x78,
-	0x49, 0x62, 0x51, 0x7a, 0x6a, 0x89, 0x04, 0x33, 0x44, 0x1c, 0xc2, 0x13, 0x92, 0xe0, 0x62, 0x2f,
-	0x48, 0xac, 0xcc, 0xc9, 0x4f, 0x4c, 0x91, 0x60, 0x51, 0x60, 0xd4, 0xe0, 0x09, 0x82, 0x71, 0x95,
-	0xf2, 0xb8, 0x78, 0x8b, 0x52, 0x0b, 0x72, 0x2a, 0xf1, 0x5b, 0x06, 0x35, 0x94, 0x09, 0x97, 0xa1,
-	0xcc, 0x28, 0x86, 0x0a, 0x49, 0x72, 0x71, 0xa4, 0x16, 0x15, 0xc5, 0x27, 0xe7, 0xa7, 0xa4, 0x82,
-	0xed, 0x63, 0x0d, 0x62, 0x4f, 0x2d, 0x2a, 0x72, 0xce, 0x4f, 0x49, 0x75, 0x32, 0xb9, 0xf0, 0x50,
-	0x8e, 0xe1, 0xc6, 0x43, 0x39, 0x86, 0x0f, 0x0f, 0xe5, 0x18, 0x1b, 0x1e, 0xc9, 0x31, 0xae, 0x78,
-	0x24, 0xc7, 0x78, 0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c, 0x0f, 0x1e, 0xc9, 0x31, 0xbe,
-	0x78, 0x24, 0xc7, 0xf0, 0xe1, 0x91, 0x1c, 0xe3, 0x84, 0xc7, 0x72, 0x0c, 0x17, 0x1e, 0xcb, 0x31,
-	0xdc, 0x78, 0x2c, 0xc7, 0x90, 0xc4, 0x06, 0x0e, 0x1e, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x87, 0xdd, 0xc2, 0x45, 0x2b, 0x01, 0x00, 0x00,
+	// 250 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x90, 0x3d, 0x4e, 0xc3, 0x40,
+	0x10, 0x85, 0x77, 0xe2, 0xfc, 0xe0, 0x85, 0x48, 0x68, 0x0b, 0xb4, 0x34, 0x23, 0x2b, 0x95, 0x2b,
+	0x1a, 0x38, 0x01, 0xf4, 0x14, 0xbe, 0x40, 0xb4, 0xd8, 0x23, 0x37, 0xb1, 0x76, 0x33, 0x6b, 0x24,
+	0xd2, 0x21, 0xd1, 0x50, 0x72, 0x0c, 0x8e, 0x42, 0xe9, 0x32, 0x25, 0x5e, 0x37, 0x94, 0x39, 0x02,
+	0xb2, 0x93, 0x14, 0x14, 0xa1, 0x9b, 0xef, 0xbd, 0xe2, 0x7b, 0x1a, 0x19, 0xb3, 0xcb, 0x6f, 0x1c,
+	0xdb, 0xda, 0xaa, 0xc9, 0x4b, 0x69, 0x2a, 0x5a, 0xbc, 0x81, 0x3c, 0x67, 0x5a, 0x2f, 0x2b, 0xf2,
+	0xde, 0x94, 0xa4, 0x2e, 0x65, 0xe4, 0x69, 0xad, 0x21, 0x81, 0x74, 0x9e, 0xf5, 0xa7, 0xba, 0x92,
+	0x53, 0x6f, 0x9f, 0x39, 0x27, 0x3d, 0x4a, 0x20, 0x8d, 0xb3, 0x03, 0xf5, 0x79, 0x6d, 0xb8, 0xa4,
+	0x5a, 0x47, 0xfb, 0x7c, 0x4f, 0x4a, 0xcb, 0x59, 0xe5, 0xcb, 0x47, 0x53, 0x91, 0x1e, 0x0f, 0xc5,
+	0x11, 0xfb, 0xc6, 0x99, 0xcd, 0xca, 0x9a, 0x42, 0x4f, 0x12, 0x48, 0x2f, 0xb2, 0x23, 0x2e, 0xde,
+	0x41, 0xce, 0x99, 0xdc, 0x6a, 0xf3, 0xff, 0x8e, 0x83, 0x6f, 0x74, 0xca, 0x17, 0x9d, 0xf4, 0x8d,
+	0xff, 0xf8, 0xd4, 0xb5, 0x3c, 0x23, 0xe6, 0x65, 0x6e, 0x0b, 0x1a, 0xa6, 0xc4, 0xd9, 0x8c, 0x98,
+	0x1f, 0x6c, 0x41, 0xf7, 0x77, 0x4d, 0x8b, 0x62, 0xdb, 0xa2, 0xd8, 0xb5, 0x08, 0xaf, 0x01, 0xe1,
+	0x33, 0x20, 0x7c, 0x05, 0x84, 0x26, 0x20, 0x7c, 0x07, 0x84, 0x9f, 0x80, 0x62, 0x17, 0x10, 0x3e,
+	0x3a, 0x14, 0x4d, 0x87, 0x62, 0xdb, 0xa1, 0x78, 0x9a, 0x0e, 0x4f, 0xbd, 0xfd, 0x0d, 0x00, 0x00,
+	0xff, 0xff, 0x53, 0xf2, 0x6c, 0x2e, 0x61, 0x01, 0x00, 0x00,
 }
 
 func (this *ReqMessage) Equal(that interface{}) bool {
@@ -211,6 +228,9 @@ func (this *ReqMessage) Equal(that interface{}) bool {
 		return false
 	}
 	if this.Target != that1.Target {
+		return false
+	}
+	if this.MsgName != that1.MsgName {
 		return false
 	}
 	if !bytes.Equal(this.Payload, that1.Payload) {
@@ -243,6 +263,9 @@ func (this *ReplyMessage) Equal(that interface{}) bool {
 	if this.Target != that1.Target {
 		return false
 	}
+	if this.MsgName != that1.MsgName {
+		return false
+	}
 	if !bytes.Equal(this.Payload, that1.Payload) {
 		return false
 	}
@@ -255,11 +278,12 @@ func (this *ReqMessage) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&xgame.ReqMessage{")
 	s = append(s, "Seq: "+fmt.Sprintf("%#v", this.Seq)+",\n")
 	s = append(s, "Source: "+fmt.Sprintf("%#v", this.Source)+",\n")
 	s = append(s, "Target: "+fmt.Sprintf("%#v", this.Target)+",\n")
+	s = append(s, "MsgName: "+fmt.Sprintf("%#v", this.MsgName)+",\n")
 	s = append(s, "Payload: "+fmt.Sprintf("%#v", this.Payload)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
@@ -268,10 +292,11 @@ func (this *ReplyMessage) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&xgame.ReplyMessage{")
 	s = append(s, "Seq: "+fmt.Sprintf("%#v", this.Seq)+",\n")
 	s = append(s, "Target: "+fmt.Sprintf("%#v", this.Target)+",\n")
+	s = append(s, "MsgName: "+fmt.Sprintf("%#v", this.MsgName)+",\n")
 	s = append(s, "Payload: "+fmt.Sprintf("%#v", this.Payload)+",\n")
 	s = append(s, "ErrCode: "+fmt.Sprintf("%#v", this.ErrCode)+",\n")
 	s = append(s, "}")
@@ -309,6 +334,13 @@ func (m *ReqMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.Payload)
 		copy(dAtA[i:], m.Payload)
 		i = encodeVarintRpc(dAtA, i, uint64(len(m.Payload)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.MsgName) > 0 {
+		i -= len(m.MsgName)
+		copy(dAtA[i:], m.MsgName)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.MsgName)))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -354,15 +386,24 @@ func (m *ReplyMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.ErrCode != 0 {
-		i = encodeVarintRpc(dAtA, i, uint64(m.ErrCode))
+	if len(m.ErrCode) > 0 {
+		i -= len(m.ErrCode)
+		copy(dAtA[i:], m.ErrCode)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.ErrCode)))
 		i--
-		dAtA[i] = 0x20
+		dAtA[i] = 0x2a
 	}
 	if len(m.Payload) > 0 {
 		i -= len(m.Payload)
 		copy(dAtA[i:], m.Payload)
 		i = encodeVarintRpc(dAtA, i, uint64(len(m.Payload)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.MsgName) > 0 {
+		i -= len(m.MsgName)
+		copy(dAtA[i:], m.MsgName)
+		i = encodeVarintRpc(dAtA, i, uint64(len(m.MsgName)))
 		i--
 		dAtA[i] = 0x1a
 	}
@@ -409,6 +450,10 @@ func (m *ReqMessage) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovRpc(uint64(l))
 	}
+	l = len(m.MsgName)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
 	l = len(m.Payload)
 	if l > 0 {
 		n += 1 + l + sovRpc(uint64(l))
@@ -429,12 +474,17 @@ func (m *ReplyMessage) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovRpc(uint64(l))
 	}
+	l = len(m.MsgName)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
 	l = len(m.Payload)
 	if l > 0 {
 		n += 1 + l + sovRpc(uint64(l))
 	}
-	if m.ErrCode != 0 {
-		n += 1 + sovRpc(uint64(m.ErrCode))
+	l = len(m.ErrCode)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
 	}
 	return n
 }
@@ -453,6 +503,7 @@ func (this *ReqMessage) String() string {
 		`Seq:` + fmt.Sprintf("%v", this.Seq) + `,`,
 		`Source:` + fmt.Sprintf("%v", this.Source) + `,`,
 		`Target:` + fmt.Sprintf("%v", this.Target) + `,`,
+		`MsgName:` + fmt.Sprintf("%v", this.MsgName) + `,`,
 		`Payload:` + fmt.Sprintf("%v", this.Payload) + `,`,
 		`}`,
 	}, "")
@@ -465,6 +516,7 @@ func (this *ReplyMessage) String() string {
 	s := strings.Join([]string{`&ReplyMessage{`,
 		`Seq:` + fmt.Sprintf("%v", this.Seq) + `,`,
 		`Target:` + fmt.Sprintf("%v", this.Target) + `,`,
+		`MsgName:` + fmt.Sprintf("%v", this.MsgName) + `,`,
 		`Payload:` + fmt.Sprintf("%v", this.Payload) + `,`,
 		`ErrCode:` + fmt.Sprintf("%v", this.ErrCode) + `,`,
 		`}`,
@@ -522,7 +574,7 @@ func (m *ReqMessage) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Seq |= int32(b&0x7F) << shift
+				m.Seq |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -592,6 +644,38 @@ func (m *ReqMessage) Unmarshal(dAtA []byte) error {
 			m.Target = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MsgName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MsgName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Payload", wireType)
 			}
@@ -689,7 +773,7 @@ func (m *ReplyMessage) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Seq |= int32(b&0x7F) << shift
+				m.Seq |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -728,6 +812,38 @@ func (m *ReplyMessage) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MsgName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MsgName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Payload", wireType)
 			}
 			var byteLen int
@@ -760,11 +876,11 @@ func (m *ReplyMessage) Unmarshal(dAtA []byte) error {
 				m.Payload = []byte{}
 			}
 			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
+		case 5:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ErrCode", wireType)
 			}
-			m.ErrCode = 0
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowRpc
@@ -774,11 +890,24 @@ func (m *ReplyMessage) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ErrCode |= int32(b&0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ErrCode = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipRpc(dAtA[iNdEx:])

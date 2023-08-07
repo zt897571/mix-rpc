@@ -1,17 +1,16 @@
 package tcp
 
 import (
-	"encoding/binary"
-	"github.com/gogo/protobuf/proto"
+	"errors"
+	"golang/common/error_code"
 	"golang/common/log"
-	"golang/common/xnet/packet"
-	xgame "golang/proto"
+	iface2 "golang/common/xnet/iface"
 	"io"
 	"net"
 	"time"
 )
 
-type ConnectionInfo struct {
+type TcpConnection struct {
 	conn          net.Conn
 	recvMsgNum    uint32
 	activeTime    int64
@@ -19,36 +18,17 @@ type ConnectionInfo struct {
 	readChanStop  chan struct{}
 	writeChan     chan []byte
 	writeChanStop chan struct{}
-	config        *ConnectionConfig
+	config        *iface2.ConnectionConfig
+	msgHandler    iface2.INetMsgHandler
 }
 
-type ConnectionConfig struct {
-	ByteOrder       binary.ByteOrder
-	PkgHeadLen      int
-	ReadChanelSize  int
-	WriteChanelSize int
-}
+var _ iface2.IConnection = (*TcpConnection)(nil)
 
-func NewDefaultConnectionConfig() *ConnectionConfig {
-	return &ConnectionConfig{
-		ByteOrder:       binary.BigEndian,
-		PkgHeadLen:      4,
-		ReadChanelSize:  1000,
-		WriteChanelSize: 1000,
-	}
-}
-
-func NewConnectionInfo(conn net.Conn, config *ConnectionConfig, option ...ConnectionOption) *ConnectionInfo {
-	//if tc, ok := conn.(*net.TCPConn); ok {
-	//	// todo: zhangtuo config or option
-	//	_ = tc.SetNoDelay(true)
-	//	_ = tc.SetReadBuffer(1024)
-	//	_ = tc.SetWriteBuffer(1024)
-	//}
+func NewConnectionInfo(conn net.Conn, config *iface2.ConnectionConfig) *TcpConnection {
 	if config == nil {
-		config = NewDefaultConnectionConfig()
+		config = iface2.NewDefaultConnectionConfig()
 	}
-	ci := &ConnectionInfo{
+	ci := &TcpConnection{
 		conn:          conn,
 		activeTime:    time.Now().Unix(),
 		readChan:      make(chan []byte, config.ReadChanelSize),
@@ -57,23 +37,23 @@ func NewConnectionInfo(conn net.Conn, config *ConnectionConfig, option ...Connec
 		writeChanStop: make(chan struct{}),
 		config:        config,
 	}
-	ci.ApplyOption(option...)
 	return ci
 }
 
-func (ci *ConnectionInfo) ApplyOption(option ...ConnectionOption) {
+func (ci *TcpConnection) ApplyOption(option ...iface2.ConnectionOption) {
 	for _, opt := range option {
 		opt(ci.conn)
 	}
 }
 
-func (ci *ConnectionInfo) Run() {
+func (ci *TcpConnection) Run() {
+	defer ci.OnClose()
 	go ci.handleLoop()
 	go ci.writeLoop()
 	ci.recv()
 }
 
-func (ci *ConnectionInfo) handleLoop() {
+func (ci *TcpConnection) handleLoop() {
 	for {
 		select {
 		case payload := <-ci.readChan:
@@ -84,39 +64,11 @@ func (ci *ConnectionInfo) handleLoop() {
 	}
 }
 
-func (ci *ConnectionInfo) handle(payload []byte) {
-	flag := ci.config.ByteOrder.Uint32(payload[:4])
-	if packet.CheckFlag(flag, packet.REQ_FLAG) {
-		// req msg
-		reqMsg := &xgame.ReqMessage{}
-		err := proto.Unmarshal(payload[4:], reqMsg)
-		if err != nil {
-			log.Errorf("Unmarsha error =%v", err)
-		} else {
-			// todo:zhangtuo 1. msg <=> msgType
-			// 2. 分发到具体process处理
-			msg := &xgame.TestMsg{}
-			proto.Unmarshal(reqMsg.Payload, msg)
-			log.Info(msg.Msg)
-			if packet.CheckFlag(flag, packet.CALL_FLAG) {
-				// reply msg
-				replyBin, _ := proto.Marshal(&xgame.ReplyMessage{
-					Seq:     reqMsg.Seq,
-					Payload: reqMsg.Payload,
-				})
-				time.AfterFunc(time.Duration(msg.DelayTime)*time.Second, func() {
-					flagByte := make([]byte, 4)
-					ci.config.ByteOrder.PutUint32(flagByte, 0)
-					ci.Send(append(flagByte, replyBin...))
-				})
-			}
-		}
-	} else {
-		//回复消息
-	}
+func (ci *TcpConnection) handle(payload []byte) {
+	ci.msgHandler.OnReceiveMsg(payload)
 }
 
-func (ci *ConnectionInfo) writeLoop() {
+func (ci *TcpConnection) writeLoop() {
 	for {
 		select {
 		case payload := <-ci.writeChan:
@@ -137,7 +89,7 @@ func (ci *ConnectionInfo) writeLoop() {
 	}
 }
 
-func (ci *ConnectionInfo) recv() {
+func (ci *TcpConnection) recv() {
 	defer ci.Close()
 	for {
 		headByte, err := readBytes(ci.conn, ci.config.PkgHeadLen)
@@ -154,19 +106,35 @@ func (ci *ConnectionInfo) recv() {
 	}
 }
 
-func (ci *ConnectionInfo) Send(msg []byte) {
-	ci.writeChan <- msg
+func (ci *TcpConnection) Send(msg []byte) error {
+	// todo:: zhangtuo 处理channel满了的情况
+	select {
+	case ci.writeChan <- msg:
+	default:
+		return error_code.ChannelIsFull
+	}
+	return nil
 }
 
-func (ci *ConnectionInfo) Close() {
-	ci.conn.Close()
+func (ci *TcpConnection) Close() {
+	_ = ci.conn.Close()
 }
 
-func (ci *ConnectionInfo) GetIp() string {
+func (ci *TcpConnection) OnClose() {
+	ci.msgHandler.OnDisconnected()
+}
+
+func (ci *TcpConnection) BindMsgHandler(msgHandler iface2.INetMsgHandler) {
+	msgHandler.SetConnection(ci)
+	ci.msgHandler = msgHandler
+}
+
+func (ci *TcpConnection) GetLocalAddress() string {
+	return ci.conn.LocalAddr().String()
+}
+
+func (ci *TcpConnection) GetRemoteAddress() string {
 	return ci.conn.RemoteAddr().String()
-}
-
-func (ci *ConnectionInfo) dispatchMsg(payload []byte) {
 }
 
 func readBytes(conn net.Conn, count int) ([]byte, error) {
@@ -174,10 +142,12 @@ func readBytes(conn net.Conn, count int) ([]byte, error) {
 		bytes := make([]byte, count)
 		_, err := io.ReadFull(conn, bytes)
 		if err != nil {
-			if err == io.EOF {
-				log.Info("Connection Close1")
+			if errors.Is(err, io.EOF) {
+				log.Infof("Connection Close localAddr = %s remoteAddr = %s", conn.LocalAddr(), conn.RemoteAddr())
+			} else if errors.Is(err, net.ErrClosed) {
+				log.Infof("remote Close localAddr = %s remoteAddr = %s", conn.LocalAddr(), conn.RemoteAddr())
 			} else {
-				log.Errorf("connection write error: %v", err)
+				log.Errorf("connection read error: %v", err)
 			}
 		}
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {

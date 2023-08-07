@@ -81,7 +81,7 @@ encode_msg(Msg, MsgName, Opts) ->
 encode_msg_test_msg(Msg, TrUserData) -> encode_msg_test_msg(Msg, <<>>, TrUserData).
 
 
-encode_msg_test_msg(#test_msg{msg = F1, delayTime = F2}, Bin, TrUserData) ->
+encode_msg_test_msg(#test_msg{msg = F1, delayTime = F2, rand = F3}, Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
             true ->
                 begin
@@ -92,12 +92,21 @@ encode_msg_test_msg(#test_msg{msg = F1, delayTime = F2}, Bin, TrUserData) ->
                     end
                 end
          end,
-    if F2 == undefined -> B1;
+    B2 = if F2 == undefined -> B1;
+            true ->
+                begin
+                    TrF2 = id(F2, TrUserData),
+                    if TrF2 =:= 0 -> B1;
+                       true -> e_type_int32(TrF2, <<B1/binary, 16>>, TrUserData)
+                    end
+                end
+         end,
+    if F3 == undefined -> B2;
        true ->
            begin
-               TrF2 = id(F2, TrUserData),
-               if TrF2 =:= 0 -> B1;
-                  true -> e_type_int32(TrF2, <<B1/binary, 16>>, TrUserData)
+               TrF3 = id(F3, TrUserData),
+               if TrF3 =:= 0 -> B2;
+                  true -> e_type_int32(TrF3, <<B2/binary, 24>>, TrUserData)
                end
            end
     end.
@@ -244,56 +253,63 @@ decode_msg_2_doit(test_msg, Bin, TrUserData) -> id(decode_msg_test_msg(Bin, TrUs
 
 
 
-decode_msg_test_msg(Bin, TrUserData) -> dfp_read_field_def_test_msg(Bin, 0, 0, 0, id([], TrUserData), id(0, TrUserData), TrUserData).
+decode_msg_test_msg(Bin, TrUserData) -> dfp_read_field_def_test_msg(Bin, 0, 0, 0, id([], TrUserData), id(0, TrUserData), id(0, TrUserData), TrUserData).
 
-dfp_read_field_def_test_msg(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_test_msg_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-dfp_read_field_def_test_msg(<<16, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_test_msg_delayTime(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-dfp_read_field_def_test_msg(<<>>, 0, 0, _, F@_1, F@_2, _) -> #test_msg{msg = F@_1, delayTime = F@_2};
-dfp_read_field_def_test_msg(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dg_read_field_def_test_msg(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+dfp_read_field_def_test_msg(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_test_msg_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_test_msg(<<16, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_test_msg_delayTime(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_test_msg(<<24, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_test_msg_rand(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_test_msg(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #test_msg{msg = F@_1, delayTime = F@_2, rand = F@_3};
+dfp_read_field_def_test_msg(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dg_read_field_def_test_msg(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-dg_read_field_def_test_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> dg_read_field_def_test_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-dg_read_field_def_test_msg(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+dg_read_field_def_test_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> dg_read_field_def_test_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+dg_read_field_def_test_msg(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        10 -> d_field_test_msg_msg(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        16 -> d_field_test_msg_delayTime(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        10 -> d_field_test_msg_msg(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        16 -> d_field_test_msg_delayTime(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        24 -> d_field_test_msg_rand(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> skip_varint_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                1 -> skip_64_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                2 -> skip_length_delimited_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                3 -> skip_group_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                5 -> skip_32_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+                0 -> skip_varint_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> skip_64_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> skip_length_delimited_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> skip_group_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> skip_32_test_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
             end
     end;
-dg_read_field_def_test_msg(<<>>, 0, 0, _, F@_1, F@_2, _) -> #test_msg{msg = F@_1, delayTime = F@_2}.
+dg_read_field_def_test_msg(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #test_msg{msg = F@_1, delayTime = F@_2, rand = F@_3}.
 
-d_field_test_msg_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_test_msg_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-d_field_test_msg_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+d_field_test_msg_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_test_msg_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_test_msg_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
-    dfp_read_field_def_test_msg(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+    dfp_read_field_def_test_msg(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
 
-d_field_test_msg_delayTime(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_test_msg_delayTime(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-d_field_test_msg_delayTime(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+d_field_test_msg_delayTime(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_test_msg_delayTime(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_test_msg_delayTime(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
     {NewFValue, RestF} = {begin <<Res:32/signed-native>> = <<(X bsl N + Acc):32/unsigned-native>>, id(Res, TrUserData) end, Rest},
-    dfp_read_field_def_test_msg(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+    dfp_read_field_def_test_msg(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
 
-skip_varint_test_msg(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> skip_varint_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-skip_varint_test_msg(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+d_field_test_msg_rand(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_test_msg_rand(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_test_msg_rand(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, TrUserData) ->
+    {NewFValue, RestF} = {begin <<Res:32/signed-native>> = <<(X bsl N + Acc):32/unsigned-native>>, id(Res, TrUserData) end, Rest},
+    dfp_read_field_def_test_msg(RestF, 0, 0, F, F@_1, F@_2, NewFValue, TrUserData).
 
-skip_length_delimited_test_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> skip_length_delimited_test_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-skip_length_delimited_test_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+skip_varint_test_msg(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> skip_varint_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+skip_varint_test_msg(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+skip_length_delimited_test_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> skip_length_delimited_test_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+skip_length_delimited_test_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_test_msg(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+    dfp_read_field_def_test_msg(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_group_test_msg(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+skip_group_test_msg(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_test_msg(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+    dfp_read_field_def_test_msg(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
 
-skip_32_test_msg(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+skip_32_test_msg(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_64_test_msg(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+skip_64_test_msg(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_test_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
 read_group(Bin, FieldNum) ->
     {NumBytes, EndTagLen} = read_gr_b(Bin, 0, 0, 0, 0, FieldNum),
@@ -363,7 +379,7 @@ merge_msgs(Prev, New, MsgName, Opts) ->
     case MsgName of test_msg -> merge_msg_test_msg(Prev, New, TrUserData) end.
 
 -compile({nowarn_unused_function,merge_msg_test_msg/3}).
-merge_msg_test_msg(#test_msg{msg = PFmsg, delayTime = PFdelayTime}, #test_msg{msg = NFmsg, delayTime = NFdelayTime}, _) ->
+merge_msg_test_msg(#test_msg{msg = PFmsg, delayTime = PFdelayTime, rand = PFrand}, #test_msg{msg = NFmsg, delayTime = NFdelayTime, rand = NFrand}, _) ->
     #test_msg{msg =
                   if NFmsg =:= undefined -> PFmsg;
                      true -> NFmsg
@@ -371,6 +387,10 @@ merge_msg_test_msg(#test_msg{msg = PFmsg, delayTime = PFdelayTime}, #test_msg{ms
               delayTime =
                   if NFdelayTime =:= undefined -> PFdelayTime;
                      true -> NFdelayTime
+                  end,
+              rand =
+                  if NFrand =:= undefined -> PFrand;
+                     true -> NFrand
                   end}.
 
 
@@ -391,12 +411,15 @@ verify_msg(Msg, MsgName, Opts) ->
 
 -compile({nowarn_unused_function,v_msg_test_msg/3}).
 -dialyzer({nowarn_function,v_msg_test_msg/3}).
-v_msg_test_msg(#test_msg{msg = F1, delayTime = F2}, Path, TrUserData) ->
+v_msg_test_msg(#test_msg{msg = F1, delayTime = F2, rand = F3}, Path, TrUserData) ->
     if F1 == undefined -> ok;
        true -> v_type_string(F1, [msg | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
        true -> v_type_int32(F2, [delayTime | Path], TrUserData)
+    end,
+    if F3 == undefined -> ok;
+       true -> v_type_int32(F3, [rand | Path], TrUserData)
     end,
     ok;
 v_msg_test_msg(X, Path, _TrUserData) -> mk_type_error({expected_msg, test_msg}, X, Path).
@@ -455,7 +478,11 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 'erlang_++'(A, B, _TrUserData) -> A ++ B.
 
 
-get_msg_defs() -> [{{msg, test_msg}, [#field{name = msg, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = delayTime, fnum = 2, rnum = 3, type = int32, occurrence = optional, opts = []}]}].
+get_msg_defs() ->
+    [{{msg, test_msg},
+      [#field{name = msg, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+       #field{name = delayTime, fnum = 2, rnum = 3, type = int32, occurrence = optional, opts = []},
+       #field{name = rand, fnum = 3, rnum = 4, type = int32, occurrence = optional, opts = []}]}].
 
 
 get_msg_names() -> [test_msg].
@@ -481,7 +508,10 @@ fetch_msg_def(MsgName) ->
 fetch_enum_def(EnumName) -> erlang:error({no_such_enum, EnumName}).
 
 
-find_msg_def(test_msg) -> [#field{name = msg, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = delayTime, fnum = 2, rnum = 3, type = int32, occurrence = optional, opts = []}];
+find_msg_def(test_msg) ->
+    [#field{name = msg, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+     #field{name = delayTime, fnum = 2, rnum = 3, type = int32, occurrence = optional, opts = []},
+     #field{name = rand, fnum = 3, rnum = 4, type = int32, occurrence = optional, opts = []}];
 find_msg_def(_) -> error.
 
 
