@@ -8,28 +8,15 @@
 package tcp
 
 import (
-	"golang/common/log"
+	iface2 "golang/common/xnet/iface"
 	"net"
 )
 
-type Client struct {
-	*ConnectionInfo
-}
-
-func NewClient() *Client {
-	return &Client{}
-}
-
-func (c *Client) Connect(address string) error {
+func Connect(address string, config *iface2.ConnectionConfig) (iface2.IConnection, error) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.ConnectionInfo = NewConnectionInfo(conn, c.config)
-	c.ConnectionInfo.Run()
-	return nil
-}
-
-func (c *Client) onDisconnect() {
-	log.Info("Connection disconnected")
+	cn := NewConnectionInfo(conn, config)
+	return cn, nil
 }
