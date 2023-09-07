@@ -3,15 +3,15 @@ package xgame;
 
 message req_message {
   uint32 seq = 1;   // 序列号
-  string source = 2;  // 调用方
-  string target = 3;  // 目标对象
+  bytes source = 2;  // 调用方
+  bytes target = 3;  // 目标对象
   string msgName = 4;
   bytes payload = 5;  // 具体协议内容
 }
 
 message reply_message {
   uint32 seq = 1;
-  string target = 2;
+  bytes target = 2;
   string msgName = 3;
   bytes payload = 4;
   string err_code = 5;

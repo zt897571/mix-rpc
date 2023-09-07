@@ -8,38 +8,29 @@ package echo_server
 
 import (
 	iface2 "golang/common/xnet/iface"
+	"golang/common/xnet/tcp"
 )
 
 type EchoServer struct {
-	conn iface2.IConnection
+	server iface2.INetServer
 }
 
-var _ iface2.INetMsgHandler = (*EchoServer)(nil)
-
-func NewEchoServer() *EchoServer {
-	return &EchoServer{}
+func NewEchoServer(addr string) *EchoServer {
+	return &EchoServer{
+		server: tcp.NewServer(addr, nil),
+	}
 }
 
-func (t *EchoServer) SendMsg(bytes []byte) error {
-	return t.conn.Send(bytes)
+func (t *EchoServer) Start() {
+	t.server.Start(t)
 }
 
-func (t *EchoServer) OnReceiveMsg(msg []byte) {
-	_ = t.conn.Send(msg)
-}
-
-func (t *EchoServer) OnDisconnected() {
-}
-
-func (t *EchoServer) SetConnection(info iface2.IConnection) {
-	t.conn = info
-}
-
-func (t *EchoServer) GetConnection() iface2.IConnection {
-	return t.conn
+func (t *EchoServer) Stop() {
+	t.server.Stop()
 }
 
 func (t *EchoServer) OnNewConnection(connection iface2.IConnection) {
-	connection.BindMsgHandler(t)
+	ts := &EchoService{}
+	connection.BindMsgHandler(ts)
 	go connection.Run()
 }

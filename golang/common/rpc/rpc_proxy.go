@@ -25,49 +25,48 @@ type RpcProxy struct {
 	seq        uint32
 	conn       iface2.IConnection
 	reqWaitMap sync.Map
-	hashCode   iface.HashCode
+	remoteHost string
+	host       string
 }
 
 func NewRpcProxy() iface.IRpcProxy {
 	return &RpcProxy{}
 }
 
-func (r *RpcProxy) NodeCall(message proto.Message, timeout time.Duration) (proto.Message, error) {
-	seq := r.nextId()
+func (r *RpcProxy) ActorCast(message proto.Message, source iface.IPid, target iface.IPid) error {
+	seq := r.NextSeq()
 	reqMsg := &xgame.ReqMessage{
-		Seq: seq,
+		Seq:    seq,
+		Source: source.Encode(),
+		Target: target.Encode(),
 	}
-	reqBin, err := BuildReqMsg(reqMsg, message, BuildFlag([]FlagType{NODEMSG_FLAG, CALL_FLAG, REQ_FLAG}))
-	if err != nil {
-		return nil, err
-	}
-	return r.sendAndWait(reqBin, seq, timeout)
-}
-
-func (r *RpcProxy) NodeCast(message proto.Message) error {
-	reqMsg := &xgame.ReqMessage{}
-	reqBin, err := BuildReqMsg(reqMsg, message, BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG}))
+	msg, err := BuildReqMsg(reqMsg, message, BuildFlag([]FlagType{REQ_FLAG}))
 	if err != nil {
 		return err
 	}
-	return r.conn.Send(reqBin)
+	return r.conn.Send(msg)
 }
 
 func (r *RpcProxy) OnReceiveMsg(payload []byte) {
 	flag := binary.BigEndian.Uint32(payload[:4])
 	data := payload[4:]
-
-	if CheckFlag(flag, NODEMSG_FLAG) {
-		if CheckFlag(flag, REQ_FLAG) {
+	if CheckFlag(flag, REQ_FLAG) {
+		// 请求消息处理
+		if CheckFlag(flag, NODEMSG_FLAG) {
 			r.handleNodeReqMsg(data, flag)
 		} else {
-			r.handleNodeResponse(data)
+			r.handleActorReqMsg(data, flag)
 		}
 	} else {
-		//actor msg
-		if CheckFlag(flag, REQ_FLAG) {
-			r.handleActorReqMsg(flag, data)
-		} else {
+		// 回复消息处理
+		replyMsg := &xgame.ReplyMessage{}
+		err := proto.Unmarshal(data, replyMsg)
+		if err != nil {
+			log.Errorf("Unmarsha error =%v", err)
+			return
+		}
+		if anyChan, ok := r.reqWaitMap.Load(replyMsg.Seq); ok {
+			anyChan.(chan *xgame.ReplyMessage) <- replyMsg
 		}
 	}
 }
@@ -98,7 +97,7 @@ func (r *RpcProxy) handleNodeReqMsg(msg []byte, flag uint32) {
 		if CheckFlag(flag, CALL_FLAG) {
 			result, err1 := handler.NodeCall(r, contentMsg)
 			replyFlag := BuildFlag([]FlagType{NODEMSG_FLAG})
-			err = r.replyReq(reqMsg, replyFlag, result, err1)
+			err = r.ReplyReq(reqMsg, replyFlag, result, err1)
 		} else {
 			err = handler.NodeCast(r, contentMsg)
 		}
@@ -122,7 +121,7 @@ func (r *RpcProxy) handleNodeResponse(msg []byte) {
 	}
 }
 
-func (r *RpcProxy) handleActorReqMsg(flag uint32, data []byte) {
+func (r *RpcProxy) handleActorReqMsg(data []byte, flag uint32) {
 	// req msg
 	reqMsg := &xgame.ReqMessage{}
 	err := proto.Unmarshal(data, reqMsg)
@@ -130,29 +129,15 @@ func (r *RpcProxy) handleActorReqMsg(flag uint32, data []byte) {
 		log.Errorf("Unmarsha error =%v", err)
 		return
 	}
-	// todo:zhangtuo 1. msg <=> msgType
-	// 2. 分发到具体process处理
-	msg := &xgame.TestMsg{}
-	err = proto.Unmarshal(reqMsg.Payload, msg)
+	err = processDispatcher.DispatchMsg(flag, reqMsg, r)
 	if err != nil {
+		log.Errorf("handle actor msg error =%v", err)
 		return
-	}
-	if CheckFlag(flag, CALL_FLAG) {
-		// reply msg
-		//replyBin, _ := proto.Marshal(&xgame.ReplyMessage{
-		//	Seq:     reqMsg.Seq,
-		//	Payload: reqMsg.Payload,
-		//})
-		//time.AfterFunc(time.Duration(msg.DelayTime)*time.Second, func() {
-		//	flagByte := make([]byte, 4)
-		//	ci.config.ByteOrder.PutUint32(flagByte, 0)
-		//	ci.Send(append(flagByte, replyBin...))
-		//})
 	}
 }
 
 // 回复请求
-func (r *RpcProxy) replyReq(req *xgame.ReqMessage, flag uint32, message proto.Message, err error) error {
+func (r *RpcProxy) ReplyReq(req *xgame.ReqMessage, flag uint32, message proto.Message, err error) error {
 	var errorCode string
 	if err != nil {
 		errorCode = err.Error()
@@ -168,49 +153,40 @@ func (r *RpcProxy) replyReq(req *xgame.ReqMessage, flag uint32, message proto.Me
 	return r.conn.Send(replyBin)
 }
 
-func (r *RpcProxy) nextId() uint32 {
+func (r *RpcProxy) NextSeq() uint32 {
 	return atomic.AddUint32(&r.seq, 1)
 }
 
-func (r *RpcProxy) sendMsg(flag uint32, message proto.Message) error {
-	data, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
-	flagByte := make([]byte, 4)
-	binary.BigEndian.PutUint32(flagByte, flag)
-	return r.conn.Send(append(flagByte, data...))
-}
-
-func (r *RpcProxy) sendAndWait(binData []byte, seq uint32, timeout time.Duration) (proto.Message, error) {
-	WaitChan := make(chan *xgame.ReplyMessage)
-	r.reqWaitMap.Store(seq, WaitChan)
+func (r *RpcProxy) Call(binData []byte, result <-chan *xgame.ReplyMessage) error {
+	seq := r.NextSeq()
+	r.reqWaitMap.Store(seq, result)
 	defer r.reqWaitMap.Delete(seq)
-	err := r.conn.Send(binData)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case response := <-WaitChan:
-		msg, err := GetProtoMsg(response.Payload, response.MsgName)
-		if err != nil {
-			return nil, err
-		}
-		if response.ErrCode != "" {
-			err = errors.New(response.ErrCode)
-		}
-		return msg, err
-	case <-time.After(timeout):
-		return nil, error_code.TimeOutError
-	}
+	return r.conn.Send(binData)
 }
 
-func (r *RpcProxy) GetHashCode() iface.HashCode {
-	if r.hashCode == "" {
-		remoteAddr := r.conn.GetRemoteAddress()
-		r.hashCode = iface.HashCode(remoteAddr)
+func (r *RpcProxy) Send(binData []byte) error {
+	return r.conn.Send(binData)
+}
+
+func (r *RpcProxy) RegSeq(seq uint32, result chan *xgame.ReplyMessage) {
+	r.reqWaitMap.Store(seq, result)
+}
+
+func (r *RpcProxy) UnRegSeq(seq uint32) {
+	r.reqWaitMap.Delete(seq)
+}
+
+func (r *RpcProxy) GetHost() string {
+	if r.remoteHost == "" {
+		r.remoteHost = r.conn.GetRemoteAddress()
 	}
-	return r.hashCode
+	return r.remoteHost
+}
+
+var processDispatcher iface.IRpcDispatcher
+
+func RegisterProcessDispatcher(dispatcher iface.IRpcDispatcher) {
+	processDispatcher = dispatcher
 }
 
 func Connect(IpAddress string) (iface.IRpcProxy, error) {
@@ -227,4 +203,44 @@ func Connect(IpAddress string) (iface.IRpcProxy, error) {
 		connection.Run()
 	}()
 	return rpcProxy, nil
+}
+
+func NodeCast(proxy iface.IRpcProxy, message proto.Message) error {
+	reqMsg := &xgame.ReqMessage{}
+	reqBin, err := BuildReqMsg(reqMsg, message, BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG}))
+	if err != nil {
+		return err
+	}
+	return proxy.Send(reqBin)
+}
+
+func NodeCall(proxy iface.IRpcProxy, message proto.Message, timeout time.Duration) (proto.Message, error) {
+	seq := proxy.NextSeq()
+	reqMsg := &xgame.ReqMessage{
+		Seq: seq,
+	}
+	reqBin, err := BuildReqMsg(reqMsg, message, BuildFlag([]FlagType{NODEMSG_FLAG, CALL_FLAG, REQ_FLAG}))
+	if err != nil {
+		return nil, err
+	}
+	replyChan := make(chan *xgame.ReplyMessage)
+	proxy.RegSeq(seq, replyChan)
+	defer proxy.UnRegSeq(seq)
+	err = proxy.Send(reqBin)
+	if err != nil {
+		return nil, err
+	}
+	select {
+	case response := <-replyChan:
+		msg, err := GetProtoMsg(response.Payload, response.MsgName)
+		if err != nil {
+			return nil, err
+		}
+		if response.ErrCode != "" {
+			err = errors.New(response.ErrCode)
+		}
+		return msg, err
+	case <-time.After(timeout):
+		return nil, error_code.TimeOutError
+	}
 }

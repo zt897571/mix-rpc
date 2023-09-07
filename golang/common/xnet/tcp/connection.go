@@ -57,15 +57,12 @@ func (ci *TcpConnection) handleLoop() {
 	for {
 		select {
 		case payload := <-ci.readChan:
-			ci.handle(payload)
+			ci.msgHandler.OnReceiveMsg(payload)
 		case <-ci.readChanStop:
-			break
+			ci.msgHandler.OnDisconnected()
+			return
 		}
 	}
-}
-
-func (ci *TcpConnection) handle(payload []byte) {
-	ci.msgHandler.OnReceiveMsg(payload)
 }
 
 func (ci *TcpConnection) writeLoop() {
@@ -84,7 +81,7 @@ func (ci *TcpConnection) writeLoop() {
 				}
 			}
 		case <-ci.writeChanStop:
-			break
+			return
 		}
 	}
 }
@@ -107,7 +104,6 @@ func (ci *TcpConnection) recv() {
 }
 
 func (ci *TcpConnection) Send(msg []byte) error {
-	// todo:: zhangtuo 处理channel满了的情况
 	select {
 	case ci.writeChan <- msg:
 	default:
@@ -121,12 +117,13 @@ func (ci *TcpConnection) Close() {
 }
 
 func (ci *TcpConnection) OnClose() {
-	ci.msgHandler.OnDisconnected()
+	close(ci.writeChanStop)
+	close(ci.readChanStop)
 }
 
 func (ci *TcpConnection) BindMsgHandler(msgHandler iface2.INetMsgHandler) {
-	msgHandler.SetConnection(ci)
 	ci.msgHandler = msgHandler
+	msgHandler.SetConnection(ci)
 }
 
 func (ci *TcpConnection) GetLocalAddress() string {

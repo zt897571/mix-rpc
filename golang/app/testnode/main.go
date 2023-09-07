@@ -5,6 +5,9 @@ import (
 )
 
 func main() {
-	server := rpc.NewRpcServer(8000)
-	server.Start()
+	server := rpc.NewRpcServer("0.0.0.0:8000")
+	err := server.Start()
+	if err != nil {
+		return
+	}
 }

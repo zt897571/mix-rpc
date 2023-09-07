@@ -22,10 +22,9 @@ type IConnection interface {
 	GetRemoteAddress() string
 }
 
-type IServer interface {
-	Start(INewConnection)
+type INetServer interface {
+	Start(INewConnection) error
 	Stop()
-	SetConnectionOpt(option ...ConnectionOption)
 }
 
 type INewConnection interface {

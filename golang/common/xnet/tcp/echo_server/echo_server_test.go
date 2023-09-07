@@ -9,19 +9,16 @@ package echo_server
 import (
 	"fmt"
 	"github.com/smartystreets/goconvey/convey"
-	"golang/common/xnet/tcp"
 	"testing"
 	"time"
 )
 
-var server *tcp.Server
-var testPort = 8000
-var ipaddress = fmt.Sprintf("localhost:%d", 8000)
+var echoServer *EchoServer
+var ipaddress = fmt.Sprintf("localhost:%d", 9000)
 
 func init() {
-	server = tcp.NewServer(testPort, nil)
-	echoServer := NewEchoServer()
-	go server.Start(echoServer)
+	echoServer = NewEchoServer(ipaddress)
+	go echoServer.Start()
 	time.Sleep(time.Millisecond * 500)
 }
 
@@ -39,7 +36,7 @@ func TestSendMsg(t *testing.T) {
 		convey.So(err, convey.ShouldEqual, nil)
 		err = client.SendMsg(reqMsg)
 		convey.So(err, convey.ShouldEqual, nil)
-		response, err := client.WaitResponse(time.Second * 5)
+		response, err := client.WaitResponse(time.Second)
 		convey.So(response, convey.ShouldEqual, reqMsg)
 		convey.So(err, convey.ShouldEqual, nil)
 	})
@@ -58,7 +55,6 @@ func TestSeqSendMsg(t *testing.T) {
 			convey.So(err, convey.ShouldEqual, nil)
 			convey.So(response.(string), convey.ShouldEqual, msg)
 		}
-
 		for i := 0; i < 100; i++ {
 			msg := fmt.Sprintf("%s-%d", reqMsg, i)
 			err = client.SendMsg(msg)
