@@ -21,8 +21,14 @@ func NewRpcServer(addr string) *RpcServer {
 	return svr
 }
 
-func (r *RpcServer) Start() error {
-	return r.server.Start(r)
+func (r *RpcServer) Start(isBackUp bool) error {
+	if isBackUp {
+		// todo zhangtuo 1.wait start finish, 2.handle error cod
+		go r.server.Start(r)
+		return nil
+	} else {
+		return r.server.Start(r)
+	}
 }
 
 func (r *RpcServer) OnNewConnection(connection iface2.IConnection) {

@@ -7,7 +7,11 @@
 package rpc
 
 import (
+	"github.com/gogo/protobuf/proto"
+	"golang/common/error_code"
 	iface2 "golang/common/iface"
+	"golang/common/utils"
+	xgame "golang/proto"
 	"sync"
 )
 
@@ -22,15 +26,11 @@ func GetRpcProxyMgr() *RpcProxyMgr {
 }
 
 func newRpcProxyMgr() *RpcProxyMgr {
-	return &RpcProxyMgr{
-		mhMap: map[string]iface2.INodeMsgHandler{},
-	}
+	return &RpcProxyMgr{}
 }
 
 type RpcProxyMgr struct {
 	proxyMap sync.Map
-	rwlock   sync.RWMutex
-	mhMap    map[string]iface2.INodeMsgHandler
 }
 
 func (r *RpcProxyMgr) GetProxy(host string) iface2.IRpcProxy {
@@ -41,24 +41,62 @@ func (r *RpcProxyMgr) GetProxy(host string) iface2.IRpcProxy {
 }
 
 func (r *RpcProxyMgr) RegisterProxy(proxy iface2.IRpcProxy) {
-	r.proxyMap.Store(proxy.GetHost(), proxy)
+	r.proxyMap.Store(proxy.GetRemoteHost(), proxy)
 }
 
 func (r *RpcProxyMgr) RemoveProxy(proxy iface2.IRpcProxy) {
-	r.proxyMap.Delete(proxy.GetHost())
+	r.proxyMap.Delete(proxy.GetRemoteHost())
 }
 
-func (r *RpcProxyMgr) RegisterNodeMsg(protoName string, handler iface2.INodeMsgHandler) {
-	r.rwlock.Lock()
-	defer r.rwlock.Unlock()
-	r.mhMap[protoName] = handler
+func (r *RpcProxyMgr) GetAllProxy() []iface2.IRpcProxy {
+	var allProxy []iface2.IRpcProxy
+	r.proxyMap.Range(func(key, value any) bool {
+		allProxy = append(allProxy, value.(iface2.IRpcProxy))
+		return true
+	})
+	return allProxy
 }
 
-func (r *RpcProxyMgr) GetNodeMsgHandler(protoName string) iface2.INodeMsgHandler {
-	r.rwlock.RLock()
-	defer r.rwlock.RUnlock()
-	if h, ok := r.mhMap[protoName]; ok {
-		return h
+var mhMap = make(map[string]map[string]*utils.FuncDesc)
+
+func RegisterNodeMsg(module string, instance any) {
+	fs := utils.ScanFunction(instance)
+	mp := make(map[string]*utils.FuncDesc)
+	for _, f := range fs {
+		mp[f.Name] = f
 	}
-	return nil
+	mhMap[module] = mp
+}
+
+func applyMfa(mfa *xgame.Mfa) (proto.Message, error) {
+	var funcMap map[string]*utils.FuncDesc
+	var ok bool
+	if funcMap, ok = mhMap[mfa.Module]; !ok {
+		return nil, error_code.MfaError
+	}
+	if _, ok := funcMap[mfa.Function]; !ok {
+		return nil, error_code.MfaError
+	}
+	msg, err := GetProtoMsg(mfa.Args.Payload, mfa.Args.MsgName)
+	if err != nil {
+		return nil, err
+	}
+	rst, err := funcMap[mfa.Function].SafeCall(msg)
+	if err != nil {
+		return nil, err
+	}
+	if len(rst) == 0 {
+		return nil, nil
+	}
+	if len(rst) != 2 {
+		return nil, error_code.MfaError
+	}
+	var result proto.Message
+	if rst[0].Interface() != nil {
+		result = rst[0].Interface().(proto.Message)
+	}
+	if rst[1].Interface() != nil {
+		err = rst[1].Interface().(error)
+	}
+	return result, err
 }

@@ -1,18 +1,36 @@
 syntax = "proto3";
 package xgame;
 
-message req_message {
-  uint32 seq = 1;   // 序列号
-  bytes source = 2;  // 调用方
-  bytes target = 3;  // 目标对象
-  string msgName = 4;
-  bytes payload = 5;  // 具体协议内容
+message process_msg {
+  bytes source = 1;  // 调用方
+  bytes target = 2;  // 目标对象
+  rpc_params params = 3;  //参数
 }
 
+message mfa {
+  string module = 1;
+  string function = 2;
+  rpc_params args = 3;
+}
+
+message rpc_params {
+  string msgName = 1;
+  bytes payload = 2;  // 具体协议内容
+}
+
+message rpc_result {
+  string msgName = 1;
+  bytes payload = 2;
+  string error = 3;
+}
+
+// 请求消息
+message req_message {
+  mfa  node_msg = 1;
+  process_msg process_msg = 2;
+}
+
+// 回复消息
 message reply_message {
-  uint32 seq = 1;
-  bytes target = 2;
-  string msgName = 3;
-  bytes payload = 4;
-  string err_code = 5;
+  rpc_result result = 1;
 }

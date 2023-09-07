@@ -4,6 +4,7 @@
 package xgame
 
 import (
+	bytes "bytes"
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
 	io "io"
@@ -28,6 +29,7 @@ type TestMsg struct {
 	Msg       string `protobuf:"bytes,1,opt,name=msg,proto3" json:"msg,omitempty"`
 	DelayTime int32  `protobuf:"varint,2,opt,name=delayTime,proto3" json:"delayTime,omitempty"`
 	Rand      int32  `protobuf:"varint,3,opt,name=rand,proto3" json:"rand,omitempty"`
+	TestBt    []byte `protobuf:"bytes,4,opt,name=testBt,proto3" json:"testBt,omitempty"`
 }
 
 func (m *TestMsg) Reset()      { *m = TestMsg{} }
@@ -83,25 +85,116 @@ func (m *TestMsg) GetRand() int32 {
 	return 0
 }
 
+func (m *TestMsg) GetTestBt() []byte {
+	if m != nil {
+		return m.TestBt
+	}
+	return nil
+}
+
+type ReqGetPidList struct {
+}
+
+func (m *ReqGetPidList) Reset()      { *m = ReqGetPidList{} }
+func (*ReqGetPidList) ProtoMessage() {}
+func (*ReqGetPidList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c06e4cca6c2cc899, []int{1}
+}
+func (m *ReqGetPidList) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ReqGetPidList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ReqGetPidList.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ReqGetPidList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReqGetPidList.Merge(m, src)
+}
+func (m *ReqGetPidList) XXX_Size() int {
+	return m.Size()
+}
+func (m *ReqGetPidList) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReqGetPidList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ReqGetPidList proto.InternalMessageInfo
+
+type ReplyGetPidList struct {
+	Pids [][]byte `protobuf:"bytes,1,rep,name=pids,proto3" json:"pids,omitempty"`
+}
+
+func (m *ReplyGetPidList) Reset()      { *m = ReplyGetPidList{} }
+func (*ReplyGetPidList) ProtoMessage() {}
+func (*ReplyGetPidList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c06e4cca6c2cc899, []int{2}
+}
+func (m *ReplyGetPidList) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ReplyGetPidList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ReplyGetPidList.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ReplyGetPidList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReplyGetPidList.Merge(m, src)
+}
+func (m *ReplyGetPidList) XXX_Size() int {
+	return m.Size()
+}
+func (m *ReplyGetPidList) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReplyGetPidList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ReplyGetPidList proto.InternalMessageInfo
+
+func (m *ReplyGetPidList) GetPids() [][]byte {
+	if m != nil {
+		return m.Pids
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*TestMsg)(nil), "xgame.test_msg")
+	proto.RegisterType((*ReqGetPidList)(nil), "xgame.ReqGetPidList")
+	proto.RegisterType((*ReplyGetPidList)(nil), "xgame.ReplyGetPidList")
 }
 
 func init() { proto.RegisterFile("msg.proto", fileDescriptor_c06e4cca6c2cc899) }
 
 var fileDescriptor_c06e4cca6c2cc899 = []byte{
-	// 168 bytes of a gzipped FileDescriptorProto
+	// 227 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xcc, 0x2d, 0x4e, 0xd7,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0xad, 0x48, 0x4f, 0xcc, 0x4d, 0x55, 0xf2, 0xe3, 0xe2,
+	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0xad, 0x48, 0x4f, 0xcc, 0x4d, 0x55, 0x4a, 0xe3, 0xe2,
 	0x28, 0x49, 0x2d, 0x2e, 0x89, 0xcf, 0x2d, 0x4e, 0x17, 0x12, 0xe0, 0x62, 0xce, 0x2d, 0x4e, 0x97,
 	0x60, 0x54, 0x60, 0xd4, 0xe0, 0x0c, 0x02, 0x31, 0x85, 0x64, 0xb8, 0x38, 0x53, 0x52, 0x73, 0x12,
 	0x2b, 0x43, 0x32, 0x73, 0x53, 0x25, 0x98, 0x14, 0x18, 0x35, 0x58, 0x83, 0x10, 0x02, 0x42, 0x42,
-	0x5c, 0x2c, 0x45, 0x89, 0x79, 0x29, 0x12, 0xcc, 0x60, 0x09, 0x30, 0xdb, 0xc9, 0xe4, 0xc2, 0x43,
-	0x39, 0x86, 0x1b, 0x0f, 0xe5, 0x18, 0x3e, 0x3c, 0x94, 0x63, 0x6c, 0x78, 0x24, 0xc7, 0xb8, 0xe2,
-	0x91, 0x1c, 0xe3, 0x89, 0x47, 0x72, 0x8c, 0x17, 0x1e, 0xc9, 0x31, 0x3e, 0x78, 0x24, 0xc7, 0xf8,
-	0xe2, 0x91, 0x1c, 0xc3, 0x87, 0x47, 0x72, 0x8c, 0x13, 0x1e, 0xcb, 0x31, 0x5c, 0x78, 0x2c, 0xc7,
-	0x70, 0xe3, 0xb1, 0x1c, 0x43, 0x12, 0x1b, 0xd8, 0x4d, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x1c, 0xc2, 0xa8, 0xca, 0xa0, 0x00, 0x00, 0x00,
+	0x5c, 0x2c, 0x45, 0x89, 0x79, 0x29, 0x12, 0xcc, 0x60, 0x09, 0x30, 0x5b, 0x48, 0x8c, 0x8b, 0x0d,
+	0x64, 0x9e, 0x53, 0x89, 0x04, 0x8b, 0x02, 0xa3, 0x06, 0x4f, 0x10, 0x94, 0xa7, 0xc4, 0xcf, 0xc5,
+	0x1b, 0x94, 0x5a, 0xe8, 0x9e, 0x5a, 0x12, 0x90, 0x99, 0xe2, 0x93, 0x59, 0x5c, 0xa2, 0xa4, 0xca,
+	0xc5, 0x1f, 0x94, 0x5a, 0x90, 0x53, 0x89, 0x10, 0x02, 0x99, 0x57, 0x90, 0x99, 0x52, 0x2c, 0xc1,
+	0xa8, 0xc0, 0xac, 0xc1, 0x13, 0x04, 0x66, 0x3b, 0x99, 0x5c, 0x78, 0x28, 0xc7, 0x70, 0xe3, 0xa1,
+	0x1c, 0xc3, 0x87, 0x87, 0x72, 0x8c, 0x0d, 0x8f, 0xe4, 0x18, 0x57, 0x3c, 0x92, 0x63, 0x3c, 0xf1,
+	0x48, 0x8e, 0xf1, 0xc2, 0x23, 0x39, 0xc6, 0x07, 0x8f, 0xe4, 0x18, 0x5f, 0x3c, 0x92, 0x63, 0xf8,
+	0xf0, 0x48, 0x8e, 0x71, 0xc2, 0x63, 0x39, 0x86, 0x0b, 0x8f, 0xe5, 0x18, 0x6e, 0x3c, 0x96, 0x63,
+	0x48, 0x62, 0x03, 0xfb, 0xd1, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0xbe, 0x6c, 0x5c, 0xfc, 0xf0,
+	0x00, 0x00, 0x00,
 }
 
 func (this *TestMsg) Equal(that interface{}) bool {
@@ -132,17 +225,90 @@ func (this *TestMsg) Equal(that interface{}) bool {
 	if this.Rand != that1.Rand {
 		return false
 	}
+	if !bytes.Equal(this.TestBt, that1.TestBt) {
+		return false
+	}
+	return true
+}
+func (this *ReqGetPidList) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ReqGetPidList)
+	if !ok {
+		that2, ok := that.(ReqGetPidList)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	return true
+}
+func (this *ReplyGetPidList) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ReplyGetPidList)
+	if !ok {
+		that2, ok := that.(ReplyGetPidList)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if len(this.Pids) != len(that1.Pids) {
+		return false
+	}
+	for i := range this.Pids {
+		if !bytes.Equal(this.Pids[i], that1.Pids[i]) {
+			return false
+		}
+	}
 	return true
 }
 func (this *TestMsg) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 8)
 	s = append(s, "&xgame.TestMsg{")
 	s = append(s, "Msg: "+fmt.Sprintf("%#v", this.Msg)+",\n")
 	s = append(s, "DelayTime: "+fmt.Sprintf("%#v", this.DelayTime)+",\n")
 	s = append(s, "Rand: "+fmt.Sprintf("%#v", this.Rand)+",\n")
+	s = append(s, "TestBt: "+fmt.Sprintf("%#v", this.TestBt)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReqGetPidList) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 4)
+	s = append(s, "&xgame.ReqGetPidList{")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ReplyGetPidList) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&xgame.ReplyGetPidList{")
+	s = append(s, "Pids: "+fmt.Sprintf("%#v", this.Pids)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -174,6 +340,13 @@ func (m *TestMsg) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.TestBt) > 0 {
+		i -= len(m.TestBt)
+		copy(dAtA[i:], m.TestBt)
+		i = encodeVarintMsg(dAtA, i, uint64(len(m.TestBt)))
+		i--
+		dAtA[i] = 0x22
+	}
 	if m.Rand != 0 {
 		i = encodeVarintMsg(dAtA, i, uint64(m.Rand))
 		i--
@@ -190,6 +363,61 @@ func (m *TestMsg) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintMsg(dAtA, i, uint64(len(m.Msg)))
 		i--
 		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ReqGetPidList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ReqGetPidList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ReqGetPidList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *ReplyGetPidList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ReplyGetPidList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ReplyGetPidList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Pids) > 0 {
+		for iNdEx := len(m.Pids) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Pids[iNdEx])
+			copy(dAtA[i:], m.Pids[iNdEx])
+			i = encodeVarintMsg(dAtA, i, uint64(len(m.Pids[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -221,6 +449,34 @@ func (m *TestMsg) Size() (n int) {
 	if m.Rand != 0 {
 		n += 1 + sovMsg(uint64(m.Rand))
 	}
+	l = len(m.TestBt)
+	if l > 0 {
+		n += 1 + l + sovMsg(uint64(l))
+	}
+	return n
+}
+
+func (m *ReqGetPidList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *ReplyGetPidList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Pids) > 0 {
+		for _, b := range m.Pids {
+			l = len(b)
+			n += 1 + l + sovMsg(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -238,6 +494,26 @@ func (this *TestMsg) String() string {
 		`Msg:` + fmt.Sprintf("%v", this.Msg) + `,`,
 		`DelayTime:` + fmt.Sprintf("%v", this.DelayTime) + `,`,
 		`Rand:` + fmt.Sprintf("%v", this.Rand) + `,`,
+		`TestBt:` + fmt.Sprintf("%v", this.TestBt) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReqGetPidList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReqGetPidList{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ReplyGetPidList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ReplyGetPidList{`,
+		`Pids:` + fmt.Sprintf("%v", this.Pids) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -349,6 +625,172 @@ func (m *TestMsg) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TestBt", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMsg
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TestBt = append(m.TestBt[:0], dAtA[iNdEx:postIndex]...)
+			if m.TestBt == nil {
+				m.TestBt = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ReqGetPidList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ReqGetPidList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ReqGetPidList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ReplyGetPidList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ReplyGetPidList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ReplyGetPidList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pids", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMsg
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Pids = append(m.Pids, make([]byte, postIndex-iNdEx))
+			copy(m.Pids[len(m.Pids)-1], dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMsg(dAtA[iNdEx:])
