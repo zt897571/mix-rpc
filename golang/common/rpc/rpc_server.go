@@ -7,22 +7,22 @@
 package rpc
 
 import (
+	"golang/common/log"
 	iface2 "golang/common/xnet/iface"
 	"golang/common/xnet/tcp"
 )
 
 type RpcServer struct {
-	server iface2.IServer
+	server iface2.INetServer
 }
 
-func NewRpcServer(port int) *RpcServer {
-	tcpServer := tcp.NewServer(port, nil)
-	svr := &RpcServer{server: tcpServer}
+func NewRpcServer(addr string) *RpcServer {
+	svr := &RpcServer{server: tcp.NewServer(addr, nil)}
 	return svr
 }
 
-func (r *RpcServer) Start() {
-	r.server.Start(r)
+func (r *RpcServer) Start() error {
+	return r.server.Start(r)
 }
 
 func (r *RpcServer) OnNewConnection(connection iface2.IConnection) {
@@ -32,5 +32,6 @@ func (r *RpcServer) OnNewConnection(connection iface2.IConnection) {
 		GetRpcProxyMgr().RegisterProxy(rpcProxy)
 		defer GetRpcProxyMgr().RemoveProxy(rpcProxy)
 		connection.Run()
+		log.Infof("Connection Stop = %v", connection.GetRemoteAddress())
 	}()
 }

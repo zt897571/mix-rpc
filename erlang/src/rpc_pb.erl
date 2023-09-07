@@ -100,9 +100,9 @@ encode_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName 
             true ->
                 begin
                     TrF2 = id(F2, TrUserData),
-                    case is_empty_string(TrF2) of
-                        true -> B1;
-                        false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+                    case iolist_size(TrF2) of
+                        0 -> B1;
+                        _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
                     end
                 end
          end,
@@ -110,9 +110,9 @@ encode_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName 
             true ->
                 begin
                     TrF3 = id(F3, TrUserData),
-                    case is_empty_string(TrF3) of
-                        true -> B2;
-                        false -> e_type_string(TrF3, <<B2/binary, 26>>, TrUserData)
+                    case iolist_size(TrF3) of
+                        0 -> B2;
+                        _ -> e_type_bytes(TrF3, <<B2/binary, 26>>, TrUserData)
                     end
                 end
          end,
@@ -154,9 +154,9 @@ encode_msg_reply_message(#reply_message{seq = F1, target = F2, msgName = F3, pay
             true ->
                 begin
                     TrF2 = id(F2, TrUserData),
-                    case is_empty_string(TrF2) of
-                        true -> B1;
-                        false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+                    case iolist_size(TrF2) of
+                        0 -> B1;
+                        _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
                     end
                 end
          end,
@@ -334,7 +334,7 @@ decode_msg_2_doit(reply_message, Bin, TrUserData) -> id(decode_msg_reply_message
 
 
 
-decode_msg_req_message(Bin, TrUserData) -> dfp_read_field_def_req_message(Bin, 0, 0, 0, id(0, TrUserData), id([], TrUserData), id([], TrUserData), id([], TrUserData), id(<<>>, TrUserData), TrUserData).
+decode_msg_req_message(Bin, TrUserData) -> dfp_read_field_def_req_message(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), id(<<>>, TrUserData), id([], TrUserData), id(<<>>, TrUserData), TrUserData).
 
 dfp_read_field_def_req_message(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_seq(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 dfp_read_field_def_req_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_source(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -371,12 +371,12 @@ d_field_req_message_seq(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_
 
 d_field_req_message_source(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_source(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 d_field_req_message_source(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
     dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, NewFValue, F@_3, F@_4, F@_5, TrUserData).
 
 d_field_req_message_target(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_target(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 d_field_req_message_target(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
     dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, F@_2, NewFValue, F@_4, F@_5, TrUserData).
 
 d_field_req_message_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -406,7 +406,7 @@ skip_32_req_message(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@
 
 skip_64_req_message(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-decode_msg_reply_message(Bin, TrUserData) -> dfp_read_field_def_reply_message(Bin, 0, 0, 0, id(0, TrUserData), id([], TrUserData), id([], TrUserData), id(<<>>, TrUserData), id([], TrUserData), TrUserData).
+decode_msg_reply_message(Bin, TrUserData) -> dfp_read_field_def_reply_message(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), id([], TrUserData), id(<<>>, TrUserData), id([], TrUserData), TrUserData).
 
 dfp_read_field_def_reply_message(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_seq(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 dfp_read_field_def_reply_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_target(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -443,7 +443,7 @@ d_field_reply_message_seq(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F
 
 d_field_reply_message_target(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_target(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
 d_field_reply_message_target(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
     dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, NewFValue, F@_3, F@_4, F@_5, TrUserData).
 
 d_field_reply_message_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
@@ -619,10 +619,10 @@ v_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName = F4,
        true -> v_type_uint32(F1, [seq | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
-       true -> v_type_string(F2, [source | Path], TrUserData)
+       true -> v_type_bytes(F2, [source | Path], TrUserData)
     end,
     if F3 == undefined -> ok;
-       true -> v_type_string(F3, [target | Path], TrUserData)
+       true -> v_type_bytes(F3, [target | Path], TrUserData)
     end,
     if F4 == undefined -> ok;
        true -> v_type_string(F4, [msgName | Path], TrUserData)
@@ -640,7 +640,7 @@ v_msg_reply_message(#reply_message{seq = F1, target = F2, msgName = F3, payload 
        true -> v_type_uint32(F1, [seq | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
-       true -> v_type_string(F2, [target | Path], TrUserData)
+       true -> v_type_bytes(F2, [target | Path], TrUserData)
     end,
     if F3 == undefined -> ok;
        true -> v_type_string(F3, [msgName | Path], TrUserData)
@@ -717,13 +717,13 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 get_msg_defs() ->
     [{{msg, req_message},
       [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-       #field{name = source, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
-       #field{name = target, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
+       #field{name = source, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
+       #field{name = target, fnum = 3, rnum = 4, type = bytes, occurrence = optional, opts = []},
        #field{name = msgName, fnum = 4, rnum = 5, type = string, occurrence = optional, opts = []},
        #field{name = payload, fnum = 5, rnum = 6, type = bytes, occurrence = optional, opts = []}]},
      {{msg, reply_message},
       [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-       #field{name = target, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
+       #field{name = target, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
        #field{name = msgName, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
        #field{name = payload, fnum = 4, rnum = 5, type = bytes, occurrence = optional, opts = []},
        #field{name = err_code, fnum = 5, rnum = 6, type = string, occurrence = optional, opts = []}]}].
@@ -754,13 +754,13 @@ fetch_enum_def(EnumName) -> erlang:error({no_such_enum, EnumName}).
 
 find_msg_def(req_message) ->
     [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-     #field{name = source, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
-     #field{name = target, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
+     #field{name = source, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
+     #field{name = target, fnum = 3, rnum = 4, type = bytes, occurrence = optional, opts = []},
      #field{name = msgName, fnum = 4, rnum = 5, type = string, occurrence = optional, opts = []},
      #field{name = payload, fnum = 5, rnum = 6, type = bytes, occurrence = optional, opts = []}];
 find_msg_def(reply_message) ->
     [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-     #field{name = target, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
+     #field{name = target, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
      #field{name = msgName, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
      #field{name = payload, fnum = 4, rnum = 5, type = bytes, occurrence = optional, opts = []},
      #field{name = err_code, fnum = 5, rnum = 6, type = string, occurrence = optional, opts = []}];

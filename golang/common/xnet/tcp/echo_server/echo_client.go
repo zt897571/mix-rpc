@@ -8,6 +8,7 @@ package echo_server
 
 import (
 	"golang/common/error_code"
+	"golang/common/log"
 	iface2 "golang/common/xnet/iface"
 	"golang/common/xnet/tcp"
 	"time"
@@ -46,6 +47,7 @@ func (e *EchoClient) OnReceiveMsg(msg []byte) {
 }
 
 func (e *EchoClient) OnDisconnected() {
+	log.Infof("Client disconnect Local = %s", e.conn.GetLocalAddress())
 	e.msgChan <- CLOSE_MSG
 }
 

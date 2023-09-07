@@ -11,8 +11,8 @@
 -define('REQ_MESSAGE_PB_H', true).
 -record(req_message,
         {seq = 0                :: non_neg_integer() | undefined, % = 1, optional, 32 bits
-         source = []            :: unicode:chardata() | undefined, % = 2, optional
-         target = []            :: unicode:chardata() | undefined, % = 3, optional
+         source = <<>>          :: iodata() | undefined, % = 2, optional
+         target = <<>>          :: iodata() | undefined, % = 3, optional
          msgName = []           :: unicode:chardata() | undefined, % = 4, optional
          payload = <<>>         :: iodata() | undefined % = 5, optional
         }).
@@ -22,7 +22,7 @@
 -define('REPLY_MESSAGE_PB_H', true).
 -record(reply_message,
         {seq = 0                :: non_neg_integer() | undefined, % = 1, optional, 32 bits
-         target = []            :: unicode:chardata() | undefined, % = 2, optional
+         target = <<>>          :: iodata() | undefined, % = 2, optional
          msgName = []           :: unicode:chardata() | undefined, % = 3, optional
          payload = <<>>         :: iodata() | undefined, % = 4, optional
          err_code = []          :: unicode:chardata() | undefined % = 5, optional

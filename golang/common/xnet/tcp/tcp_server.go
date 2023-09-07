@@ -9,38 +9,36 @@ package tcp
 
 import (
 	"context"
+	"errors"
 	"golang/common/log"
 	iface2 "golang/common/xnet/iface"
 	"net"
-	"strconv"
 	"sync/atomic"
 	"syscall"
 )
 
 type Server struct {
-	start           int32
-	listen          net.Listener
-	connctionOption []iface2.ConnectionOption
-	connConfig      *iface2.ConnectionConfig
-	port            int
-	handler         iface2.INewConnection
+	start      int32
+	addr       string
+	listen     net.Listener
+	connConfig *iface2.ConnectionConfig
+	handler    iface2.INewConnection
 }
 
-var _ iface2.IServer = (*Server)(nil)
+var _ iface2.INetServer = (*Server)(nil)
 
-func NewServer(port int, connConfig *iface2.ConnectionConfig) *Server {
+func NewServer(addr string, connConfig *iface2.ConnectionConfig) *Server {
 	return &Server{
 		connConfig: connConfig,
-		port:       port,
+		addr:       addr,
 	}
 }
 
-func (s *Server) Start(handler iface2.INewConnection) {
+func (s *Server) Start(handler iface2.INewConnection) error {
 	if atomic.LoadInt32(&s.start) == 1 || handler == nil {
-		return
+		return errors.New("started")
 	}
 	s.handler = handler
-	hostPort := net.JoinHostPort("", strconv.Itoa(s.port))
 	ls := net.ListenConfig{
 		// 重用端口
 		Control: func(network, address string, c syscall.RawConn) error {
@@ -53,10 +51,9 @@ func (s *Server) Start(handler iface2.INewConnection) {
 			})
 		},
 	}
-	listen, err := ls.Listen(context.Background(), "tcp", hostPort)
+	listen, err := ls.Listen(context.Background(), "tcp", s.addr)
 	if err != nil {
-		log.Errorf("Listen error: %v", err)
-		return
+		return err
 	}
 	s.listen = listen
 	func() {
@@ -65,20 +62,14 @@ func (s *Server) Start(handler iface2.INewConnection) {
 		for {
 			conn, err := listen.Accept()
 			if err != nil {
+				log.Errorf("Accept Error = %s", err)
 				return
 			}
-			s.handleConnection(conn)
+			ci := NewConnectionInfo(conn, s.connConfig)
+			s.handler.OnNewConnection(ci)
 		}
 	}()
-}
-
-func (s *Server) SetConnectionOpt(option ...iface2.ConnectionOption) {
-	s.connctionOption = option
-}
-
-func (s *Server) handleConnection(conn net.Conn) {
-	ci := NewConnectionInfo(conn, s.connConfig)
-	s.handler.OnNewConnection(ci)
+	return nil
 }
 
 func (s *Server) Stop() {

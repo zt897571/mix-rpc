@@ -28,24 +28,24 @@ func newRpcProxyMgr() *RpcProxyMgr {
 }
 
 type RpcProxyMgr struct {
-	pMap   sync.Map
-	rwlock sync.RWMutex
-	mhMap  map[string]iface2.INodeMsgHandler
+	proxyMap sync.Map
+	rwlock   sync.RWMutex
+	mhMap    map[string]iface2.INodeMsgHandler
 }
 
-func (r *RpcProxyMgr) GetProxy(key string) iface2.IRpcProxy {
-	if k, ok := r.pMap.Load(key); ok {
+func (r *RpcProxyMgr) GetProxy(host string) iface2.IRpcProxy {
+	if k, ok := r.proxyMap.Load(host); ok {
 		return k.(iface2.IRpcProxy)
 	}
 	return nil
 }
 
 func (r *RpcProxyMgr) RegisterProxy(proxy iface2.IRpcProxy) {
-	r.pMap.Store(proxy.GetHashCode(), proxy)
+	r.proxyMap.Store(proxy.GetHost(), proxy)
 }
 
 func (r *RpcProxyMgr) RemoveProxy(proxy iface2.IRpcProxy) {
-	r.pMap.Delete(proxy.GetHashCode())
+	r.proxyMap.Delete(proxy.GetHost())
 }
 
 func (r *RpcProxyMgr) RegisterNodeMsg(protoName string, handler iface2.INodeMsgHandler) {

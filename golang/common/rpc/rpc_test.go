@@ -10,7 +10,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/smartystreets/goconvey/convey"
 	"golang/common/iface"
-	utils "golang/common/util"
+	"golang/common/utils"
 	xgame "golang/proto"
 	"math/rand"
 	"sync"
@@ -24,7 +24,7 @@ var handler *TestNodeHandler
 func init() {
 	handler = newTestNodeHandler()
 	GetRpcProxyMgr().RegisterNodeMsg("xgame.test_msg", handler)
-	server = NewRpcServer(8000)
+	server = NewRpcServer("0.0.0.0:8000")
 	go server.Start()
 }
 
@@ -62,8 +62,8 @@ func TestConnect(t *testing.T) {
 func TestNodeCall(t *testing.T) {
 	convey.Convey("test node call", t, func() {
 		reqMsg := &xgame.TestMsg{Msg: "testing"}
-		client, err := Connect("localhost:8000")
-		rsp, err := client.NodeCall(reqMsg, time.Second*5)
+		proxy, err := Connect("localhost:8000")
+		rsp, err := NodeCall(proxy, reqMsg, time.Second*5)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(rsp, convey.ShouldNotEqual, nil)
 		convey.So(rsp, convey.ShouldEqual, reqMsg)
@@ -74,15 +74,15 @@ func TestNodeBatchCall(t *testing.T) {
 	convey.Convey("test batch node call", t, func() {
 		size := 1000
 		bm := utils.NewBatchMgr(100)
+		proxy, err := Connect("localhost:8000")
 		resultChan := make(chan []proto.Message, size)
 		for i := 0; i < size; i++ {
 			bm.AddTask(func() {
-				ct, err := Connect("localhost:8000")
 				if err != nil {
 					return
 				}
 				reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31()}
-				rsp, err := ct.NodeCall(reqMsg, time.Second*3)
+				rsp, err := NodeCall(proxy, reqMsg, time.Second*3)
 				if err != nil {
 					return
 				}
@@ -103,10 +103,10 @@ func TestNodeBatchCall(t *testing.T) {
 
 func TestNodeCast(t *testing.T) {
 	convey.Convey("test node cast", t, func() {
-		ct, err := Connect("localhost:8000")
+		proxy, err := Connect("localhost:8000")
 		convey.So(err, convey.ShouldEqual, nil)
 		reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31()}
-		err = ct.NodeCast(reqMsg)
+		err = NodeCast(proxy, reqMsg)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(handler.WaitResponse(), convey.ShouldEqual, reqMsg)
 	})
@@ -116,14 +116,12 @@ func TestNodeSeqCast(t *testing.T) {
 	convey.Convey("test node seq cast", t, func() {
 		bm := utils.NewBatchMgr(100)
 		size := 1000
+		proxy, err := Connect("localhost:8000")
+		convey.So(err, convey.ShouldEqual, nil)
 		for i := 0; i < size; i++ {
 			bm.AddTask(func() {
-				ct, err := Connect("localhost:8000")
-				if err != nil {
-					return
-				}
 				reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31()}
-				err = ct.NodeCast(reqMsg)
+				err = NodeCast(proxy, reqMsg)
 			})
 		}
 		bm.Exec()
