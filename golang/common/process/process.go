@@ -31,33 +31,33 @@ const (
 )
 
 type Process struct {
-	pid        iface.IPid
-	msgHandler iface.IActor
-	mailbox    chan *processMsg
-	stopChan   chan struct{}
-	status     Status
-	replyChan  chan iface.IRpcReplyMsg
+	pid       iface.IPid
+	actor     iface.IActor
+	mailbox   chan *processMsg
+	stopChan  chan struct{}
+	status    Status
+	replyChan chan iface.IRpcReplyMsg
 }
 
 var _ iface.IProcess = (*Process)(nil)
 var _ iface.IProcessResponser = (*Process)(nil)
 
-func newProcess(pid iface.IPid, msgHanlder iface.IActor) *Process {
+func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 	p := &Process{
-		pid:        pid,
-		msgHandler: msgHanlder,
-		mailbox:    make(chan *processMsg, 10000),
-		stopChan:   make(chan struct{}, 1),
-		status:     Init,
-		replyChan:  make(chan iface.IRpcReplyMsg, 1),
+		pid:       pid,
+		actor:     actor,
+		mailbox:   make(chan *processMsg, 10000),
+		stopChan:  make(chan struct{}, 1),
+		status:    Init,
+		replyChan: make(chan iface.IRpcReplyMsg, 1),
 	}
-	msgHanlder.SetProcess(p)
+	actor.SetProcess(p)
 	return p
 }
 
 func (p *Process) Run() {
 	defer p.OnStop()
-	p.msgHandler.OnStart()
+	p.actor.OnStart()
 	p.loop()
 }
 
@@ -114,7 +114,7 @@ func (p *Process) asyncRun(cb func()) error {
 func (p *Process) OnStop() {
 	p.status = Closing
 	GetProcessMgr().RemoveProcess(p.pid)
-	p.msgHandler.OnStop()
+	p.actor.OnStop()
 	p.status = Closed
 }
 
@@ -226,9 +226,9 @@ func (p *Process) onReq(msg iface.IProcessReqMsg, responser iface.IProcessRespon
 			return
 		}
 		// todo recover
-		rst, err = p.msgHandler.HandleCall(msg.GetFrom(), msg.GetPbMsg())
+		rst, err = p.actor.HandleCall(msg.GetFrom(), msg.GetPbMsg())
 	} else {
-		p.msgHandler.HandleCast(msg.GetFrom(), msg.GetPbMsg())
+		p.actor.HandleCast(msg.GetFrom(), msg.GetPbMsg())
 	}
 }
 
@@ -248,6 +248,10 @@ func (p *Process) ReplyReq(_ uint32, message iface.IRpcReplyMsg) error {
 	default:
 		return error_code.ProcessReplyError
 	}
+}
+
+func (p *Process) getActor() iface.IActor {
+	return p.actor
 }
 
 func getRpcProxy(target iface.IPid) (iface.IRpcProxy, error) {
