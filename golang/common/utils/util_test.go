@@ -7,19 +7,31 @@
 package utils
 
 import (
-	xgame "golang/proto"
+	"github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 type TestSt struct {
 }
 
-func (t *TestSt) HandleCall(msg *xgame.TestMsg) error {
-	return nil
+func (t *TestSt) Add(a int32, b int32) int32 {
+	return a + b
 }
 
-func (t *TestSt) handleCast() {}
+func (t *TestSt) Get(n int32) int32 {
+	return n
+}
+
+func (t *TestSt) get(n int32) int32 {
+	return n
+}
 
 func TestScanFunction(t *testing.T) {
-	ScanStruct(&TestSt{})
+	convey.Convey("test scan function", t, func() {
+		fs := ScanFunction(&TestSt{})
+		convey.So(len(fs), convey.ShouldEqual, 2)
+		rst, err := fs[0].SafeCall(1, 2)
+		convey.So(err, convey.ShouldEqual, nil)
+		convey.So(rst, convey.ShouldEqual, 3)
+	})
 }

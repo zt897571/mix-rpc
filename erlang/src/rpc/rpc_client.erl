@@ -32,8 +32,13 @@ call(Msg) ->
 call(Msg, Target, Timeout) ->
   Flag = packet_util:build_flag([?REQ_FLAG, ?CALL_FLAG, ?IS_ERLANG_NODE_FLAG]),
   BinData = msg_pb:encode_msg(Msg),
-  case gen_server:call(?MODULE, {send_msg, Flag, BinData, Target}, Timeout) of
-    {ok, Bin} -> {ok, msg_pb:decode_msg(Bin, test_msg)};
+  case gen_server:call(?MODULE, {send_msg, Flag, {element(1, Msg), BinData}, Target}, Timeout) of
+    {ok, #reply_message{err_code = Error, msgName = MsgName, payload = Payload}} ->
+      case Error =/= "" of
+        true -> list_to_atom(Error);
+        false ->
+          {ok, msg_pb:decode_msg(Payload, MsgName)}
+      end;
     Other -> Other
   end.
 
@@ -52,8 +57,8 @@ init([Addr, Port]) ->
   {ok, #state{socket = Socket}}.
 
 %% 发送消息
-handle_call({send_msg, Flag, Msg, Target}, From = {Pid, _}, State = #state{socket = Socket, seq = Seq, wait_map = WaitMap}) ->
-  {ok, BinData} = packet_util:pack_req_msg(Msg, Seq, Pid, Target),
+handle_call({send_msg, Flag, {MsgName, Bin}, Target}, From = {Pid, _}, State = #state{socket = Socket, seq = Seq, wait_map = WaitMap}) ->
+  {ok, BinData} = packet_util:pack_req_msg(MsgName, Bin, Seq, Pid, Target),
   ok = gen_tcp:send(Socket, <<Flag:32/big, BinData/binary>>),
   NewWaitMap =
     case packet_util:check_flag(Flag, ?CALL_FLAG) of
@@ -61,8 +66,8 @@ handle_call({send_msg, Flag, Msg, Target}, From = {Pid, _}, State = #state{socke
       false -> WaitMap
     end,
   {noreply, State#state{seq = next_seq_id(Seq), wait_map = NewWaitMap}}.
-handle_cast({send_msg, Flag, Msg, Target, Pid}, State = #state{socket = Socket}) ->
-  {ok, BinData} = packet_util:pack_req_msg(Msg, 0, Pid, Target),
+handle_cast({send_msg, Flag, {MsgName, Bin}, Target, Pid}, State = #state{socket = Socket}) ->
+  {ok, BinData} = packet_util:pack_req_msg(MsgName, Bin, 0, Pid, Target),
   ok = gen_tcp:send(Socket, <<Flag:32/big, BinData/binary>>),
   {noreply, State}.
 
@@ -71,22 +76,25 @@ handle_info({tcp, _, Data}, State = #state{wait_map = WaitMap, socket = Socket})
   <<Flag:32/big, BinData/binary>> = iolist_to_binary(Data),
   case packet_util:check_flag(Flag, ?REQ_FLAG) of
     true ->
-      %% 请求消息
-      spawn(fun() ->
-        ReqMsg = rpc_pb:decode_msg(BinData, req_message),
-        {ok, Reply} = gen_server:call(ReqMsg#req_message.target, ReqMsg#req_message.payload, ?RPC_TIMEOUT),
-        gen_tcp:send(Reply, Socket)
-            end),
-      ok;
+      case packet_util:check_flag(Flag, ?NODEMSG_FLAG) of
+        true -> ok;
+        false ->
+          %% 请求消息
+          spawn(fun() ->
+            ReqMsg = rpc_pb:decode_msg(BinData, req_message),
+            {ok, Reply} = gen_server:call(ReqMsg#req_message.target, ReqMsg#req_message.payload, ?RPC_TIMEOUT),
+            gen_tcp:send(Reply, Socket)
+                end)
+      end;
     false ->
       %% 回复消息
-      %%todo:zhangtuo 考虑spawn出进程处理
-      Msg = rpc_pb:decode_msg(BinData, reply_message),
+      %% todo zhangtuo  二进制包体加上seq
+      Msg = #reply_message{seq = Seq}= rpc_pb:decode_msg(BinData, reply_message),
       case maps:get(Msg#reply_message.seq, WaitMap, undefined) of
         undefined ->
-          io:format("seq = ~p not found waitMap = ~p", [Msg#reply_message.seq, WaitMap]);
+          io:format("seq = ~p not found waitMap = ~p", [Seq, WaitMap]);
         From ->
-          gen_server:reply(From, {ok, Msg#reply_message.payload})
+          gen_server:reply(From, {ok, Msg})
       end
   end,
   {noreply, State}.

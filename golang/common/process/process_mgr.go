@@ -10,8 +10,8 @@ package process
 import (
 	"golang/common/error_code"
 	"golang/common/iface"
+	"golang/common/pid"
 	"golang/common/rpc"
-	xgame "golang/proto"
 	"sync"
 )
 
@@ -21,7 +21,7 @@ func init() {
 }
 
 var mgr *ProcessMgr
-var _ iface.IRpcDispatcher = (*ProcessMgr)(nil)
+var _ iface.IProcessMsgDispatcher = (*ProcessMgr)(nil)
 
 type ProcessMgr struct {
 	processMap sync.Map
@@ -31,13 +31,12 @@ func GetProcessMgr() *ProcessMgr {
 	return mgr
 }
 
-func (p *ProcessMgr) CreateProcess(handler iface.IProcessMsgHandler) (iface.IPid, error) {
-	pid := NewPid()
-	process := newProcess(pid, handler)
-	p.RegisterProcess(process)
-
+func (p *ProcessMgr) CreateProcess(handler iface.IActor) (iface.IPid, error) {
+	id := pid.NewPid()
+	process := newProcess(id, handler)
+	GetProcessMgr().RegisterProcess(process)
 	go process.Run()
-	return pid, nil
+	return id, nil
 }
 
 func (p *ProcessMgr) RegisterProcess(process *Process) {
@@ -55,16 +54,25 @@ func (p *ProcessMgr) RemoveProcess(pid iface.IPid) {
 	p.processMap.Delete(pid)
 }
 
-func (p *ProcessMgr) DispatchMsg(flag uint32, message *xgame.ReqMessage, proxy iface.IRpcProxy) error {
-	pid, err := DecodePid(message.Target)
+func (p *ProcessMgr) DispatchMsg(msg iface.IProcessReqMsg, responser iface.IProcessResponser) error {
+	err := msg.PreDecode()
 	if err != nil {
 		return err
 	}
-	process := p.GetProcess(pid)
+	process := p.GetProcess(msg.GetTarget())
 	if process == nil {
 		return error_code.ProcessNotFound
 	}
 	return process.asyncRun(func() {
-		process.onRemoteReq(flag, message, proxy)
+		process.onReq(msg, responser)
 	})
+}
+
+func (p *ProcessMgr) GetAllPids() []iface.IPid {
+	var pids []iface.IPid
+	p.processMap.Range(func(key, value any) bool {
+		pids = append(pids, key.(iface.IPid))
+		return true
+	})
+	return pids
 }
