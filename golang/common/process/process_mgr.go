@@ -31,9 +31,9 @@ func GetProcessMgr() *ProcessMgr {
 	return mgr
 }
 
-func (p *ProcessMgr) CreateProcess(handler iface.IActor) (iface.IPid, error) {
+func (p *ProcessMgr) CreateProcess(actor iface.IActor) (iface.IPid, error) {
 	id := pid.NewPid()
-	process := newProcess(id, handler)
+	process := newProcess(id, actor)
 	GetProcessMgr().RegisterProcess(process)
 	go process.Run()
 	return id, nil

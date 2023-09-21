@@ -12,3 +12,7 @@ example
     rpc_client:connect("localhost", 8000),
     rpc_client:call(#test_msg{msg = "TestMsg"}).
 ```
+
+
+相关文档 https://lilithgames.feishu.cn/wiki/X9Bgw4rdriqVHGk69vgcPdCcnOh
+文档待完善，一切以代码为准

@@ -1,5 +1,5 @@
-// Package process -----------------------------
-// @file      : erlang_pid.go
+// Package pid process -----------------------------
+// @file      : epid.go
 // @author    : zhangtuo
 // @contact   :
 // @time      : 2023/8/24 12:07
