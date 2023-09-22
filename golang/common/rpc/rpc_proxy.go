@@ -68,9 +68,8 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 		var rst proto.Message
 		defer func() {
 			if pkg.isCall() {
-				replyFlag := BuildFlag([]iface.FlagType{NODEMSG_FLAG})
-				msg := &xgame.ReplyMessage{Result: BuildRpcResult(rst, err)}
-				err = r.SendMsg(pkg.seq, replyFlag, msg)
+				msg := BuildReplyMsg(rst, err)
+				err = r.sendMsg(pkg.seq, 0, msg)
 				if err != nil {
 					log.Errorf("Reply Request error = %v", err)
 				}
@@ -117,14 +116,6 @@ func (r *RpcProxy) handleProcessReqMsg(pkg *packet) {
 	}
 }
 
-func (r *RpcProxy) SendMsg(seq uint32, flag iface.FlagType, msg proto.Message) error {
-	msgBin, err := buildMsg(flag, seq, msg)
-	if err != nil {
-		return err
-	}
-	return r.conn.Send(msgBin)
-}
-
 func (r *RpcProxy) NextSeq() uint32 {
 	return atomic.AddUint32(&r.seq, 1)
 }
@@ -162,10 +153,7 @@ func (r *RpcProxy) ReplyReq(seq uint32, replyMsg iface.IRpcReplyMsg) error {
 	if replyMsg == nil {
 		return error_code.ArgumentError
 	}
-	msg := &xgame.ReplyMessage{
-		Result: BuildRpcResult(replyMsg.GetRpcResult()),
-	}
-	return r.SendMsg(seq, 0, msg)
+	return r.sendMsg(seq, 0, BuildReplyMsg(replyMsg.GetRpcResult()))
 }
 
 func (r *RpcProxy) OnDisconnected() {
@@ -179,9 +167,36 @@ func (r *RpcProxy) GetConnection() iface2.IConnection {
 	return r.conn
 }
 
+func (r *RpcProxy) sendMsg(seq uint32, flag FlagType, msg proto.Message) error {
+	msgBin, err := buildMsg(flag, seq, msg)
+	if err != nil {
+		return err
+	}
+	return r.conn.Send(msgBin)
+}
+
+func (r *RpcProxy) SendNodeMsg(seq uint32, isCall bool, mfa *xgame.Mfa) error {
+	flag := nodeCastFlag
+	if isCall {
+		flag = nodeCallFlag
+	}
+	return r.sendMsg(seq, flag, &xgame.ReqMessage{NodeMsg: mfa})
+}
+
+func (r *RpcProxy) SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error {
+	flag := processCastFlag
+	if isCall {
+		flag = processCallFlag
+	}
+	return r.sendMsg(seq, flag, &xgame.ReqMessage{ProcessMsg: msg})
+}
+
 var processDispatcher iface.IProcessMsgDispatcher
-var nodeCallFlag = BuildFlag([]iface.FlagType{NODEMSG_FLAG, REQ_FLAG, CALL_FLAG})
-var nodeCastFlag = BuildFlag([]iface.FlagType{NODEMSG_FLAG, REQ_FLAG})
+var nodeCallFlag = BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG, CALL_FLAG})
+var nodeCastFlag = BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG})
+
+var processCallFlag = BuildFlag([]FlagType{CALL_FLAG, REQ_FLAG})
+var processCastFlag = BuildFlag([]FlagType{REQ_FLAG})
 
 func RegisterProcessDispatcher(dispatcher iface.IProcessMsgDispatcher) {
 	processDispatcher = dispatcher
@@ -204,22 +219,15 @@ func Connect(IpAddress string) (iface.IRpcProxy, error) {
 }
 
 func NodeCast(proxy iface.IRpcProxy, mfa *xgame.Mfa) error {
-	reqMsg := &xgame.ReqMessage{
-		NodeMsg: mfa,
-	}
-	seq := proxy.NextSeq()
-	return proxy.SendMsg(seq, nodeCastFlag, reqMsg)
+	return proxy.SendNodeMsg(0, false, mfa)
 }
 
 func NodeCall(proxy iface.IRpcProxy, mfa *xgame.Mfa, timeout time.Duration) (proto.Message, error) {
 	seq := proxy.NextSeq()
-	reqMsg := &xgame.ReqMessage{
-		NodeMsg: mfa,
-	}
 	replyChan := make(chan iface.IRpcReplyMsg, 1)
 	proxy.RegSeq(seq, replyChan)
 	defer proxy.UnRegSeq(seq)
-	err := proxy.SendMsg(seq, nodeCallFlag, reqMsg)
+	err := proxy.SendNodeMsg(seq, true, mfa)
 	if err != nil {
 		return nil, err
 	}

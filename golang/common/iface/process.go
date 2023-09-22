@@ -32,10 +32,6 @@ type IPid interface {
 	IsLocal() bool
 }
 
-type IProcessResponser interface {
-	ReplyReq(seq uint32, message IRpcReplyMsg) error
-}
-
 type IProcessReqMsg interface {
 	GetSeq() uint32
 	GetFrom() IPid
@@ -47,5 +43,5 @@ type IProcessReqMsg interface {
 }
 
 type IProcessMsgDispatcher interface {
-	DispatchMsg(reqMsg IProcessReqMsg, responser IProcessResponser) error
+	DispatchMsg(reqMsg IProcessReqMsg, responser IRpcReplyer) error
 }

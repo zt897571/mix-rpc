@@ -18,9 +18,6 @@ import (
 	"time"
 )
 
-var processCallFlag = rpc.BuildFlag([]iface.FlagType{rpc.CALL_FLAG, rpc.REQ_FLAG})
-var processCastFlag = rpc.BuildFlag([]iface.FlagType{rpc.REQ_FLAG})
-
 type Status int32
 
 const (
@@ -40,7 +37,7 @@ type Process struct {
 }
 
 var _ iface.IProcess = (*Process)(nil)
-var _ iface.IProcessResponser = (*Process)(nil)
+var _ iface.IRpcReplyer = (*Process)(nil)
 
 func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 	p := &Process{
@@ -163,14 +160,12 @@ func (p *Process) castRemoteProcess(target iface.IPid, pbMsg proto.Message) erro
 	if err != nil {
 		return err
 	}
-	reqMsg := &xgame.ReqMessage{
-		ProcessMsg: &xgame.ProcessMsg{
-			Source: p.pid.Encode(),
-			Target: target.Encode(),
-			Params: rpcParams,
-		},
+	msg := &xgame.ProcessMsg{
+		Source: p.pid.Encode(),
+		Target: target.Encode(),
+		Params: rpcParams,
 	}
-	return proxy.SendMsg(0, processCastFlag, reqMsg)
+	return proxy.SendProcessMsg(0, false, msg)
 }
 
 func (p *Process) callRemoteProcess(target iface.IPid, pbMsg proto.Message, timeout time.Duration) (proto.Message, error) {
@@ -185,17 +180,15 @@ func (p *Process) callRemoteProcess(target iface.IPid, pbMsg proto.Message, time
 	if err != nil {
 		return nil, err
 	}
-	reqMsg := &xgame.ReqMessage{
-		ProcessMsg: &xgame.ProcessMsg{
-			Source: p.pid.Encode(),
-			Target: target.Encode(),
-			Params: rpcParams,
-		},
+	msg := &xgame.ProcessMsg{
+		Source: p.pid.Encode(),
+		Target: target.Encode(),
+		Params: rpcParams,
 	}
 	seq := proxy.NextSeq()
 	proxy.RegSeq(seq, p.replyChan)
 	defer proxy.UnRegSeq(seq)
-	err = proxy.SendMsg(seq, processCallFlag, reqMsg)
+	err = proxy.SendProcessMsg(seq, true, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +203,7 @@ func (p *Process) GetPid() iface.IPid {
 	return p.pid
 }
 
-func (p *Process) onReq(msg iface.IProcessReqMsg, responser iface.IProcessResponser) {
+func (p *Process) onReq(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) {
 	if msg.IsCall() {
 		var rst proto.Message
 		var err error

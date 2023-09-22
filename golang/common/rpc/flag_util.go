@@ -8,26 +8,27 @@ package rpc
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"golang/common/iface"
 	xgame "golang/proto"
 	"reflect"
 )
 
+type FlagType uint16
+
 const (
-	REQ_FLAG     iface.FlagType = 0b1
-	CALL_FLAG                   = 0b10
-	NODEMSG_FLAG                = 0b100
+	REQ_FLAG     FlagType = 0b1
+	CALL_FLAG             = 0b10
+	NODEMSG_FLAG          = 0b100
 )
 
-func BuildFlag(flagList []iface.FlagType) iface.FlagType {
-	var result iface.FlagType
+func BuildFlag(flagList []FlagType) FlagType {
+	var flag FlagType
 	for _, f := range flagList {
-		result = f ^ result
+		flag = f ^ flag
 	}
-	return result
+	return flag
 }
 
-func CheckFlag(flag iface.FlagType, flagType iface.FlagType) bool {
+func CheckFlag(flag FlagType, flagType FlagType) bool {
 	return flag&flagType == flagType
 }
 
@@ -41,8 +42,8 @@ func GetProtoMsg(msg []byte, messageName string) (proto.Message, error) {
 	return protoMsg, nil
 }
 
-func BuildRpcResult(msg proto.Message, err error) *xgame.RpcResult {
-	rst := &xgame.RpcResult{}
+func BuildReplyMsg(msg proto.Message, err error) *xgame.ReplyMessage {
+	rst := &xgame.ReplyMessage{}
 	if err != nil {
 		rst.Error = err.Error()
 	} else if msg != nil {

@@ -54,7 +54,7 @@ func (p *ProcessMgr) RemoveProcess(pid iface.IPid) {
 	p.processMap.Delete(pid)
 }
 
-func (p *ProcessMgr) DispatchMsg(msg iface.IProcessReqMsg, responser iface.IProcessResponser) error {
+func (p *ProcessMgr) DispatchMsg(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) error {
 	err := msg.PreDecode()
 	if err != nil {
 		return err
