@@ -26,7 +26,8 @@ func TestProcess(t *testing.T) {
 		process := GetProcessMgr().GetProcess(pid)
 
 		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Running)
-		process.StopAndWait()
+		err = process.StopAndWait()
+		convey.ShouldEqual(err, convey.ShouldEqual, nil)
 		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Closed)
 	})
 }

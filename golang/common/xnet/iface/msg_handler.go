@@ -23,7 +23,7 @@ type IConnection interface {
 }
 
 type INetServer interface {
-	Start(INewConnection) error
+	Start(INewConnection, chan error)
 	Stop()
 }
 

@@ -34,9 +34,16 @@ func NewServer(addr string, connConfig *iface2.ConnectionConfig) *Server {
 	}
 }
 
-func (s *Server) Start(handler iface2.INewConnection) error {
+func (s *Server) Start(handler iface2.INewConnection, startedChannel chan error) {
+	var err error
+	defer func() {
+		if err != nil {
+			startedChannel <- err
+		}
+	}()
 	if atomic.LoadInt32(&s.start) == 1 || handler == nil {
-		return errors.New("started")
+		err = errors.New("started")
+		return
 	}
 	s.handler = handler
 	ls := net.ListenConfig{
@@ -45,22 +52,21 @@ func (s *Server) Start(handler iface2.INewConnection) error {
 			return c.Control(func(fd uintptr) {
 				err := syscall.SetsockoptInt(syscall.Handle(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 				if err != nil {
-					log.Errorf("SetsockoptInt SO_REUSEADDR error: %v", err)
 					return
 				}
 			})
 		},
 	}
-	listen, err := ls.Listen(context.Background(), "tcp", s.addr)
+	s.listen, err = ls.Listen(context.Background(), "tcp", s.addr)
 	if err != nil {
-		return err
+		return
 	}
-	s.listen = listen
 	func() {
 		defer s.onClose()
 		atomic.StoreInt32(&s.start, 1)
+		startedChannel <- nil
 		for {
-			conn, err := listen.Accept()
+			conn, err := s.listen.Accept()
 			if err != nil {
 				log.Errorf("Accept Error = %s", err)
 				return
@@ -69,7 +75,6 @@ func (s *Server) Start(handler iface2.INewConnection) error {
 			s.handler.OnNewConnection(ci)
 		}
 	}()
-	return nil
 }
 
 func (s *Server) Stop() {

@@ -27,7 +27,7 @@ func main() {
 	addrSp := strings.Split(*gHost, ":")
 	iface2.SetHost(addrSp[0])
 	server := rpc.NewRpcServer(*gHost)
-	err := server.Start(true)
+	err := server.Start()
 	if err != nil {
 		log.Errorf("start server error = %s", err)
 		return
@@ -39,12 +39,14 @@ func main() {
 		fmt.Print("-> ")
 		rawText, _ := reader.ReadString('\n')
 		text := strings.Trim(strings.Trim(rawText, "\r\n"), "\n")
+		if text == "" {
+			continue
+		}
 		cmds := strings.Split(text, " ")
 		if f, ok := gCmd2Func[cmds[0]]; ok {
-			err := f(cmds[1:])
+			err := saveCall(f, cmds[1:])
 			if err != nil {
 				fmt.Println(err)
-				return
 			} else {
 				fmt.Println("ok")
 			}
@@ -52,6 +54,16 @@ func main() {
 			fmt.Println("unknow command")
 		}
 	}
+}
+
+func saveCall(f func([]string) error, args []string) error {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+			return
+		}
+	}()
+	return f(args)
 }
 
 var rpcProxy iface2.IRpcProxy
