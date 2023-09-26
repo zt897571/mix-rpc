@@ -25,7 +25,7 @@ func init() {
 	handler = newTestNodeHandler()
 	RegisterNodeMsg("test", handler)
 	server = NewRpcServer("0.0.0.0:8000")
-	err := server.Start(true)
+	err := server.Start()
 	if err != nil {
 		return
 	}

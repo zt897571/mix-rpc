@@ -13,7 +13,6 @@ import (
 	"golang/common/log"
 	"golang/common/rpc"
 	xgame "golang/proto"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -85,27 +84,36 @@ func (p *Process) Stop() {
 	p.stopChan <- struct{}{}
 }
 
-func (p *Process) StopAndWait() {
+func (p *Process) StopAndWait() error {
 	if p.GetStatus() != Running {
-		return
+		return error_code.ProcessNotRunning
 	}
-	var wt sync.WaitGroup
-	wt.Add(1)
-	p.asyncRun(func() {
-		defer wt.Done()
+	waitChan := make(chan struct{})
+	err := p.asyncRun(func() {
 		p.stopChan <- struct{}{}
+		waitChan <- struct{}{}
 	})
-	wt.Wait()
-	// todo: 考虑加入超时
+	if err != nil {
+		return err
+	}
+	select {
+	case <-waitChan:
+		return nil
+	case <-time.After(time.Second * 5):
+		return error_code.TimeOutError
+	}
 }
 
 func (p *Process) asyncRun(cb func()) error {
+	if p.GetStatus() != Running {
+		return error_code.ProcessNotRunning
+	}
 	select {
 	case p.mailbox <- &processMsg{callback: cb}:
+		return nil
 	default:
 		return error_code.ChannelIsFull
 	}
-	return nil
 }
 
 func (p *Process) OnStop() {
@@ -115,6 +123,7 @@ func (p *Process) OnStop() {
 	p.status = Closed
 }
 
+// Call 只能在本携程调用
 func (p *Process) Call(target iface.IPid, pbMsg proto.Message, timeout time.Duration) (proto.Message, error) {
 	if target == nil || pbMsg == nil {
 		return nil, error_code.ArgumentError
