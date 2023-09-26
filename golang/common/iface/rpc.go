@@ -9,6 +9,7 @@ package iface
 import (
 	"github.com/gogo/protobuf/proto"
 	"golang/common/xnet/iface"
+	xgame "golang/proto"
 )
 
 type IRpcProxy interface {
@@ -19,11 +20,14 @@ type IRpcProxy interface {
 	UnRegSeq(seq uint32)
 	GetRemoteHost() string
 	GetLocalHost() string
-	SendMsg(seq uint32, flag FlagType, message proto.Message) error
+	SendNodeMsg(seq uint32, isCall bool, msg *xgame.Mfa) error
+	SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error
 }
-
-type FlagType uint16
 
 type IRpcReplyMsg interface {
 	GetRpcResult() (proto.Message, error)
+}
+
+type IRpcReplyer interface {
+	ReplyReq(seq uint32, message IRpcReplyMsg) error
 }

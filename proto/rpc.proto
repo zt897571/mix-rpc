@@ -18,12 +18,6 @@ message rpc_params {
   bytes payload = 2;  // 具体协议内容
 }
 
-message rpc_result {
-  string msgName = 1;
-  bytes payload = 2;
-  string error = 3;
-}
-
 // 请求消息
 message req_message {
   mfa  node_msg = 1;
@@ -32,5 +26,7 @@ message req_message {
 
 // 回复消息
 message reply_message {
-  rpc_result result = 1;
+  string msgName = 1;
+  bytes payload = 2;
+  string error = 3;
 }

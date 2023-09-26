@@ -17,7 +17,7 @@ import (
 )
 
 type packet struct {
-	flag    iface.FlagType
+	flag    FlagType
 	seq     uint32
 	payload []byte
 }
@@ -29,7 +29,7 @@ func newPacket(binData []byte) (*packet, error) {
 		return nil, error_code.PacketFormatError
 	}
 	flagInt := binary.BigEndian.Uint16(binData[:2])
-	flag := iface.FlagType(flagInt)
+	flag := FlagType(flagInt)
 	seq := binary.BigEndian.Uint32(binData[2:6])
 	payload := binData[6:]
 	return &packet{
@@ -68,13 +68,10 @@ func (p *packet) GetRpcResult() (proto.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if response.Result == nil {
-		return nil, nil
-	}
-	if response.Result.Error != "" {
-		return nil, errors.New(response.Result.Error)
-	} else if response.Result.MsgName != "" && response.Result.Payload != nil {
-		return GetProtoMsg(response.Result.Payload, response.Result.MsgName)
+	if response.Error != "" {
+		return nil, errors.New(response.Error)
+	} else if response.MsgName != "" && response.Payload != nil {
+		return GetProtoMsg(response.Payload, response.MsgName)
 	}
 	return nil, nil
 }
@@ -149,7 +146,7 @@ func (p *processReqMsg) GetPbMsg() proto.Message {
 	return p.msg
 }
 
-func buildMsg(flag iface.FlagType, seq uint32, msg proto.Message) ([]byte, error) {
+func buildMsg(flag FlagType, seq uint32, msg proto.Message) ([]byte, error) {
 	msgBin, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, err
