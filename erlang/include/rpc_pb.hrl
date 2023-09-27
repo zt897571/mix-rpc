@@ -7,25 +7,46 @@
 
 -define(rpc_pb_gpb_version, "4.19.7").
 
+-ifndef('PROCESS_MSG_PB_H').
+-define('PROCESS_MSG_PB_H', true).
+-record(process_msg,
+        {source = <<>>          :: iodata() | undefined, % = 1, optional
+         target = <<>>          :: iodata() | undefined, % = 2, optional
+         params = undefined     :: rpc_pb:rpc_params() | undefined % = 3, optional
+        }).
+-endif.
+
+-ifndef('MFA_PB_H').
+-define('MFA_PB_H', true).
+-record(mfa,
+        {module = []            :: unicode:chardata() | undefined, % = 1, optional
+         function = []          :: unicode:chardata() | undefined, % = 2, optional
+         args = undefined       :: rpc_pb:rpc_params() | undefined % = 3, optional
+        }).
+-endif.
+
+-ifndef('RPC_PARAMS_PB_H').
+-define('RPC_PARAMS_PB_H', true).
+-record(rpc_params,
+        {msgName = []           :: unicode:chardata() | undefined, % = 1, optional
+         payload = <<>>         :: iodata() | undefined % = 2, optional
+        }).
+-endif.
+
 -ifndef('REQ_MESSAGE_PB_H').
 -define('REQ_MESSAGE_PB_H', true).
 -record(req_message,
-        {seq = 0                :: non_neg_integer() | undefined, % = 1, optional, 32 bits
-         source = <<>>          :: iodata() | undefined, % = 2, optional
-         target = <<>>          :: iodata() | undefined, % = 3, optional
-         msgName = []           :: unicode:chardata() | undefined, % = 4, optional
-         payload = <<>>         :: iodata() | undefined % = 5, optional
+        {node_msg = undefined   :: rpc_pb:mfa() | undefined, % = 1, optional
+         process_msg = undefined :: rpc_pb:process_msg() | undefined % = 2, optional
         }).
 -endif.
 
 -ifndef('REPLY_MESSAGE_PB_H').
 -define('REPLY_MESSAGE_PB_H', true).
 -record(reply_message,
-        {seq = 0                :: non_neg_integer() | undefined, % = 1, optional, 32 bits
-         target = <<>>          :: iodata() | undefined, % = 2, optional
-         msgName = []           :: unicode:chardata() | undefined, % = 3, optional
-         payload = <<>>         :: iodata() | undefined, % = 4, optional
-         err_code = []          :: unicode:chardata() | undefined % = 5, optional
+        {msgName = []           :: unicode:chardata() | undefined, % = 1, optional
+         payload = <<>>         :: iodata() | undefined, % = 2, optional
+         error = []             :: unicode:chardata() | undefined % = 3, optional
         }).
 -endif.
 

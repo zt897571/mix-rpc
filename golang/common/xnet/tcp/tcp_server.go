@@ -14,7 +14,7 @@ import (
 	iface2 "golang/common/xnet/iface"
 	"net"
 	"sync/atomic"
-	"syscall"
+	"time"
 )
 
 type Server struct {
@@ -47,16 +47,9 @@ func (s *Server) Start(handler iface2.INewConnection, startedChannel chan error)
 	}
 	s.handler = handler
 	ls := net.ListenConfig{
-		// 重用端口
-		Control: func(network, address string, c syscall.RawConn) error {
-			return c.Control(func(fd uintptr) {
-				err := syscall.SetsockoptInt(syscall.Handle(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-				if err != nil {
-					return
-				}
-			})
-		},
+		KeepAlive: 15 * time.Second,
 	}
+	// todo zhangtuo root context
 	s.listen, err = ls.Listen(context.Background(), "tcp", s.addr)
 	if err != nil {
 		return

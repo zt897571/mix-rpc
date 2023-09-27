@@ -21,8 +21,11 @@ func NewEchoServer(addr string) *EchoServer {
 	}
 }
 
-func (t *EchoServer) Start() {
-	t.server.Start(t)
+func (t *EchoServer) Start() error {
+	startedChannel := make(chan error)
+	go t.server.Start(t, startedChannel)
+	err := <-startedChannel
+	return err
 }
 
 func (t *EchoServer) Stop() {

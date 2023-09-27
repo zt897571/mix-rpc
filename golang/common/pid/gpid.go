@@ -11,38 +11,38 @@ package pid
 
 import (
 	"encoding/binary"
+	"fmt"
 	"golang/common/error_code"
 	"golang/common/iface"
 	"sync/atomic"
 )
 
-const localHost = "@"
-
 type gPid struct {
-	host string
-	id   uint32
+	nodeName iface.NodeName
+	id       uint32
 }
 
 var _ iface.IPid = (*gPid)(nil)
 
-func (g *gPid) GetHost() string {
-	return g.host
+func (g *gPid) String() string {
+	return fmt.Sprintf("%s:%d", g.nodeName, g.id)
 }
 
-func (g *gPid) GetId() uint32 {
-	return g.id
+func (g *gPid) GetNodeName() iface.NodeName {
+	return g.nodeName
 }
 
 func (g *gPid) IsLocal() bool {
-	return g.host == localHost || g.host == iface.GetHost()
+	return g.nodeName == iface.GetNodeName()
 }
 
 func (g *gPid) Encode() []byte {
-	bin := make([]byte, 7+len(g.host))
+	host := g.nodeName
+	bin := make([]byte, 7+len(g.nodeName))
 	bin[0] = goPidProto
 	binary.BigEndian.PutUint32(bin[1:5], g.id)
-	binary.BigEndian.PutUint16(bin[5:7], uint16(len(g.host)))
-	for i, b := range []byte(g.host) {
+	binary.BigEndian.PutUint16(bin[5:7], uint16(len(host)))
+	for i, b := range []byte(g.nodeName) {
 		bin[7+i] = b
 	}
 	return bin
@@ -66,16 +66,19 @@ func decodeGPid(bytes []byte) (iface.IPid, error) {
 		return nil, error_code.PidFormatError
 	}
 	host := string(bytes[7:])
+	if !iface.IsValidNodeName(host) {
+		return nil, error_code.NodeNameFormatError
+	}
 	return &gPid{
-		host: host,
-		id:   id,
+		nodeName: iface.NodeName(host),
+		id:       id,
 	}, nil
 }
 
 func NewPid() iface.IPid {
 	return &gPid{
-		host: iface.GetHost(),
-		id:   nextId(),
+		nodeName: iface.GetNodeName(),
+		id:       nextId(),
 	}
 }
 

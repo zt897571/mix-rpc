@@ -18,7 +18,7 @@ func TestEPid(t *testing.T) {
 			0, 0, 0, 3, 100, 222, 209, 114}
 		pid, err := DecodePid(pidBin)
 		convey.So(err, convey.ShouldEqual, nil)
-		convey.So(pid.GetHost(), convey.ShouldEqual, "10.2.58.210")
+		convey.So(pid.GetNodeName().String(), convey.ShouldEqual, "game_svr_10001@10.2.58.210")
 		convey.So(pid.Encode(), convey.ShouldEqual, pidBin)
 	})
 }
@@ -26,8 +26,8 @@ func TestEPid(t *testing.T) {
 func TestGPid(t *testing.T) {
 	convey.Convey("test golang pid", t, func() {
 		pid := &gPid{
-			id:   10086,
-			host: "10.2.58.210",
+			id:       10086,
+			nodeName: "zhangtuo@10.2.58.210",
 		}
 		bin := pid.Encode()
 		decodePid, err := DecodePid(bin)

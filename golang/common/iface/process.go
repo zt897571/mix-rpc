@@ -26,10 +26,10 @@ type IActor interface {
 }
 
 type IPid interface {
-	GetHost() string
-	GetId() uint32
+	GetNodeName() NodeName
 	Encode() []byte
 	IsLocal() bool
+	String() string
 }
 
 type IProcessReqMsg interface {
@@ -43,5 +43,6 @@ type IProcessReqMsg interface {
 }
 
 type IProcessMsgDispatcher interface {
-	DispatchMsg(reqMsg IProcessReqMsg, responser IRpcReplyer) error
+	DispatchCallMsg(reqMsg IProcessReqMsg, responser IRpcReplyer) error
+	DispatchCastMsg(msg IProcessReqMsg) error
 }

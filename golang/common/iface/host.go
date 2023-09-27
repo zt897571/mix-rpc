@@ -6,12 +6,44 @@
 // -------------------------------------------
 package iface
 
-var host string
+import (
+	"golang/common/error_code"
+	"strings"
+)
 
-func GetHost() string {
-	return host
+const nodeNameSep = "@"
+
+var gNodeName NodeName
+
+func GetNodeName() NodeName {
+	return gNodeName
 }
 
-func SetHost(h string) {
-	host = h
+func SetNodeName(nodeName string) error {
+	if !IsValidNodeName(nodeName) {
+		return error_code.NodeNameFormatError
+	}
+	gNodeName = NodeName(nodeName)
+	return nil
+}
+
+type NodeName string
+
+func IsValidNodeName(name string) bool {
+	sp := strings.Split(name, nodeNameSep)
+	return len(sp) == 2
+}
+
+func (n NodeName) GetHost() string {
+	sp := strings.Split(string(n), nodeNameSep)
+	return sp[1]
+}
+
+func (n NodeName) GetName() string {
+	sp := strings.Split(string(n), nodeNameSep)
+	return sp[0]
+}
+
+func (n NodeName) String() string {
+	return string(n)
 }

@@ -40,38 +40,67 @@ func (p *ProcessMgr) CreateProcess(actor iface.IActor) (iface.IPid, error) {
 }
 
 func (p *ProcessMgr) RegisterProcess(process *Process) {
-	p.processMap.Store(process.pid, process)
+	p.processMap.Store(process.pid.String(), process)
 }
 
 func (p *ProcessMgr) GetProcess(pid iface.IPid) *Process {
-	if v, isOk := p.processMap.Load(pid); isOk {
+	if v, isOk := p.processMap.Load(pid.String()); isOk {
 		return v.(*Process)
 	}
 	return nil
 }
 
 func (p *ProcessMgr) RemoveProcess(pid iface.IPid) {
-	p.processMap.Delete(pid)
+	p.processMap.Delete(pid.String())
 }
 
-func (p *ProcessMgr) DispatchMsg(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) error {
+func (p *ProcessMgr) DispatchCallMsg(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) error {
+	if responser == nil || msg == nil {
+		return error_code.ArgumentError
+	}
 	err := msg.PreDecode()
 	if err != nil {
 		return err
 	}
-	process := p.GetProcess(msg.GetTarget())
+	targetPid := msg.GetTarget()
+	if !targetPid.IsLocal() {
+		return error_code.ProcessNotFound
+	}
+	process := p.GetProcess(targetPid)
 	if process == nil {
 		return error_code.ProcessNotFound
 	}
 	return process.asyncRun(func() {
-		process.onReq(msg, responser)
+		process.onCallReq(msg, responser)
+	})
+}
+
+func (p *ProcessMgr) DispatchCastMsg(msg iface.IProcessReqMsg) error {
+	if msg == nil {
+		return error_code.ArgumentError
+	}
+	err := msg.PreDecode()
+	if err != nil {
+		return err
+	}
+	targetPid := msg.GetTarget()
+	if !targetPid.IsLocal() {
+		return error_code.ProcessNotFound
+	}
+	process := p.GetProcess(targetPid)
+	if process == nil {
+		return error_code.ProcessNotFound
+	}
+	return process.asyncRun(func() {
+		process.onCastReq(msg)
 	})
 }
 
 func (p *ProcessMgr) GetAllPids() []iface.IPid {
 	var pids []iface.IPid
 	p.processMap.Range(func(key, value any) bool {
-		pids = append(pids, key.(iface.IPid))
+		iPid := value.(iface.IProcess).GetPid()
+		pids = append(pids, iPid)
 		return true
 	})
 	return pids

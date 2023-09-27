@@ -26,6 +26,11 @@ const (
 	Closed
 )
 
+type IProcessReqReplyer interface {
+	iface.IRpcReplyer
+	getReplyChannel() chan iface.IRpcReplyMsg
+}
+
 type Process struct {
 	pid       iface.IPid
 	actor     iface.IActor
@@ -37,6 +42,7 @@ type Process struct {
 
 var _ iface.IProcess = (*Process)(nil)
 var _ iface.IRpcReplyer = (*Process)(nil)
+var _ IProcessReqReplyer = (*Process)(nil)
 
 func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 	p := &Process{
@@ -131,116 +137,61 @@ func (p *Process) Call(target iface.IPid, pbMsg proto.Message, timeout time.Dura
 	if target == p.pid {
 		return nil, error_code.ProcessCanNotCallSelf
 	}
-	if target.IsLocal() {
-		err := GetProcessMgr().DispatchMsg(newProcessReqMsg(p.pid, target, pbMsg, true), p)
-		if err != nil {
-			return nil, err
-		}
-		rst, err := p.waitReply(timeout)
-		if err != nil {
-			return nil, err
-		}
-		return rst.GetRpcResult()
-	} else {
-		return p.callRemoteProcess(target, pbMsg, timeout)
-	}
+	return innerCall(p.pid, target, pbMsg, timeout, p)
 }
 
 func (p *Process) Cast(target iface.IPid, pbMsg proto.Message) error {
 	if target == nil || pbMsg == nil {
 		return error_code.ArgumentError
 	}
-	if target.IsLocal() {
-		return GetProcessMgr().DispatchMsg(newProcessReqMsg(p.pid, target, pbMsg, false), nil)
-	} else {
-		return p.castRemoteProcess(target, pbMsg)
-	}
+	return innerCast(p.GetPid(), target, pbMsg)
 }
 
-func (p *Process) castRemoteProcess(target iface.IPid, pbMsg proto.Message) error {
-	if pbMsg == nil || target == nil {
-		return error_code.ArgumentError
-	}
-	proxy, err := getRpcProxy(target)
-	if err != nil {
-		return err
-	}
-	rpcParams, err := rpc.BuildRpcParams(pbMsg)
-	if err != nil {
-		return err
-	}
-	msg := &xgame.ProcessMsg{
-		Source: p.pid.Encode(),
-		Target: target.Encode(),
-		Params: rpcParams,
-	}
-	return proxy.SendProcessMsg(0, false, msg)
-}
-
-func (p *Process) callRemoteProcess(target iface.IPid, pbMsg proto.Message, timeout time.Duration) (proto.Message, error) {
-	if pbMsg == nil || target == nil {
-		return nil, error_code.ArgumentError
-	}
-	proxy, err := getRpcProxy(target)
-	if err != nil {
-		return nil, err
-	}
-	rpcParams, err := rpc.BuildRpcParams(pbMsg)
-	if err != nil {
-		return nil, err
-	}
-	msg := &xgame.ProcessMsg{
-		Source: p.pid.Encode(),
-		Target: target.Encode(),
-		Params: rpcParams,
-	}
-	seq := proxy.NextSeq()
-	proxy.RegSeq(seq, p.replyChan)
-	defer proxy.UnRegSeq(seq)
-	err = proxy.SendProcessMsg(seq, true, msg)
-	if err != nil {
-		return nil, err
-	}
-	rst, err := p.waitReply(timeout)
-	if err != nil {
-		return nil, err
-	}
-	return rst.GetRpcResult()
+func (p *Process) getReplyChannel() chan iface.IRpcReplyMsg {
+	return p.replyChan
 }
 
 func (p *Process) GetPid() iface.IPid {
 	return p.pid
 }
 
-func (p *Process) onReq(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) {
-	if msg.IsCall() {
-		var rst proto.Message
-		var err error
-		defer func() {
-			err = responser.ReplyReq(msg.GetSeq(), newRawProcessResponse(rst, err))
-			if err != nil {
-				log.Errorf("reply msg error = %v", err)
-				return
-			}
-		}()
-		err = msg.Decode()
+func (p *Process) onCallReq(msg iface.IProcessReqMsg, responser iface.IRpcReplyer) {
+	var rst proto.Message
+	var err error
+	if responser == nil {
+		log.Errorf("process respoonse is nil")
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("function panic %v", r)
+			err = error_code.Panic
+		}
+		err = responser.ReplyReq(msg.GetSeq(), newRawProcessResponse(rst, err))
 		if err != nil {
+			log.Errorf("reply msg error = %v", err)
 			return
 		}
-		// todo recover
-		rst, err = p.actor.HandleCall(msg.GetFrom(), msg.GetPbMsg())
-	} else {
-		p.actor.HandleCast(msg.GetFrom(), msg.GetPbMsg())
+	}()
+	err = msg.Decode()
+	if err != nil {
+		return
 	}
+	rst, err = p.actor.HandleCall(msg.GetFrom(), msg.GetPbMsg())
 }
 
-func (p *Process) waitReply(timeout time.Duration) (iface.IRpcReplyMsg, error) {
-	select {
-	case <-time.After(timeout):
-		return nil, error_code.TimeOutError
-	case rst := <-p.replyChan:
-		return rst, nil
+func (p *Process) onCastReq(msg iface.IProcessReqMsg) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("function panic = %v", r)
+			return
+		}
+	}()
+	err := msg.Decode()
+	if err != nil {
+		return
 	}
+	p.actor.HandleCast(msg.GetFrom(), msg.GetPbMsg())
 }
 
 func (p *Process) ReplyReq(_ uint32, message iface.IRpcReplyMsg) error {
@@ -260,11 +211,131 @@ func getRpcProxy(target iface.IPid) (iface.IRpcProxy, error) {
 	if target == nil {
 		return nil, error_code.ArgumentError
 	}
-	node := target.GetHost()
+	nodeName := target.GetNodeName()
 	proxyMgr := rpc.GetRpcProxyMgr()
-	proxy := proxyMgr.GetProxy(node)
+	proxy := proxyMgr.GetProxy(nodeName.GetHost())
 	if proxy == nil {
 		return nil, error_code.RpcProxyNotFound
 	}
 	return proxy, nil
+}
+
+type rawProcessReqReplyer struct {
+	channel chan iface.IRpcReplyMsg
+}
+
+var _ IProcessReqReplyer = (*rawProcessReqReplyer)(nil)
+
+func newRawProcessReplyer() *rawProcessReqReplyer {
+	return &rawProcessReqReplyer{
+		channel: make(chan iface.IRpcReplyMsg, 1),
+	}
+}
+
+func (t *rawProcessReqReplyer) getReplyChannel() chan iface.IRpcReplyMsg {
+	return t.channel
+}
+
+func (t *rawProcessReqReplyer) ReplyReq(_ uint32, msg iface.IRpcReplyMsg) error {
+	select {
+	case t.channel <- msg:
+		return nil
+	default:
+		return error_code.ChannelInvalid
+	}
+}
+
+func (t *rawProcessReqReplyer) getChannle() chan iface.IRpcReplyMsg {
+	return t.channel
+}
+
+func Call(targetPid iface.IPid, msg proto.Message, timeout time.Duration) (proto.Message, error) {
+	if targetPid == nil || msg == nil {
+		return nil, error_code.ArgumentError
+	}
+	t := newRawProcessReplyer()
+	return innerCall(nil, targetPid, msg, timeout, t)
+}
+
+func Cast(targetPid iface.IPid, pbMsg proto.Message) error {
+	return innerCast(nil, targetPid, pbMsg)
+}
+
+func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error {
+	if targetPid == nil || pbMsg == nil {
+		return error_code.ArgumentError
+	}
+	if targetPid.IsLocal() {
+		return GetProcessMgr().DispatchCastMsg(newProcessReqMsg(from, targetPid, pbMsg, false))
+	} else {
+		proxy, err := getRpcProxy(targetPid)
+		if err != nil {
+			return err
+		}
+		rpcParams, err := rpc.BuildRpcParams(pbMsg)
+		if err != nil {
+			return err
+		}
+		msg := &xgame.ProcessMsg{
+			Target: targetPid.Encode(),
+			Params: rpcParams,
+		}
+		return proxy.SendProcessMsg(0, false, msg)
+	}
+}
+
+func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, timeout time.Duration, replyer IProcessReqReplyer) (proto.Message, error) {
+	if targetPid.IsLocal() {
+		err := GetProcessMgr().DispatchCallMsg(newProcessReqMsg(from, targetPid, msg, true), replyer)
+		if err != nil {
+			return nil, err
+		}
+		rst, err := waitReply(timeout, replyer.getReplyChannel())
+		if err != nil {
+			return nil, err
+		}
+		return rst.GetRpcResult()
+	} else {
+		return callRemote(from, targetPid, msg, timeout, replyer.getReplyChannel())
+	}
+}
+
+func callRemote(fromPid iface.IPid, targetPid iface.IPid, pbMsg proto.Message, timeout time.Duration, waitChan chan iface.IRpcReplyMsg) (proto.Message, error) {
+	proxy, err := getRpcProxy(targetPid)
+	if err != nil {
+		return nil, err
+	}
+	rpcParams, err := rpc.BuildRpcParams(pbMsg)
+	if err != nil {
+		return nil, err
+	}
+	proMsg := &xgame.ProcessMsg{
+		Target: targetPid.Encode(),
+		Params: rpcParams,
+	}
+	if fromPid != nil {
+		proMsg.Source = fromPid.Encode()
+	}
+	seq := proxy.NextSeq()
+	proxy.RegSeq(seq, waitChan)
+	defer proxy.UnRegSeq(seq)
+	err = proxy.SendProcessMsg(seq, true, proMsg)
+	if err != nil {
+		return nil, err
+	}
+	rst, err := waitReply(timeout, waitChan)
+	if err != nil {
+		return nil, err
+	}
+	return rst.GetRpcResult()
+}
+
+// todo zhangtuo 改为使用context 整合超时流程和stop流程
+func waitReply(timeout time.Duration, waitChan chan iface.IRpcReplyMsg) (iface.IRpcReplyMsg, error) {
+	select {
+	case <-time.After(timeout):
+		return nil, error_code.TimeOutError
+	case rst := <-waitChan:
+		return rst, nil
+	}
 }
