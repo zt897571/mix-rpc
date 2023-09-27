@@ -70,7 +70,7 @@ func (p *packet) GetRpcResult() (proto.Message, error) {
 	}
 	if response.Error != "" {
 		return nil, errors.New(response.Error)
-	} else if response.MsgName != "" && response.Payload != nil {
+	} else if response.MsgName != "" {
 		return GetProtoMsg(response.Payload, response.MsgName)
 	}
 	return nil, nil
@@ -95,7 +95,7 @@ func (p *processReqMsg) PreDecode() error {
 		return error_code.LogicError
 	}
 	req := &xgame.ReqMessage{}
-	err := proto.Unmarshal(p.payload, &xgame.ReqMessage{})
+	err := proto.Unmarshal(p.payload, req)
 	if err != nil {
 		return err
 	}
@@ -115,9 +115,13 @@ func (p *processReqMsg) Decode() error {
 	if p.processMsg == nil || p.processMsg.Params == nil {
 		return error_code.PacketFormatError
 	}
-	fromPid, err := pid.DecodePid(p.processMsg.Source)
-	if err != nil {
-		return err
+	var from iface.IPid
+	if p.processMsg.Source != nil {
+		fromPid, err := pid.DecodePid(p.processMsg.Source)
+		if err != nil {
+			return err
+		}
+		from = fromPid
 	}
 	msg, err := GetProtoMsg(p.processMsg.Params.Payload, p.processMsg.Params.MsgName)
 	if err != nil {
@@ -126,7 +130,7 @@ func (p *processReqMsg) Decode() error {
 	p.payload = nil
 	p.processMsg = nil
 	p.msg = msg
-	p.fromPid = fromPid
+	p.fromPid = from
 	return nil
 }
 

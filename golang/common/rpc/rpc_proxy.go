@@ -14,6 +14,7 @@ import (
 	iface2 "golang/common/xnet/iface"
 	"golang/common/xnet/tcp"
 	xgame "golang/proto"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,14 +51,14 @@ func (r *RpcProxy) OnReceiveMsg(payload []byte) {
 		// 回复消息处理
 		rstChan := r.getRegChan(pkg.seq)
 		if rstChan == nil {
-			log.Warnf("seq = %s not found wait channel", pkg.seq)
+			log.Warnf("seq = %d not found wait channel", pkg.seq)
 			return
 		}
 		select {
 		case rstChan <- pkg:
 			return
 		default:
-			log.Errorf("channel is not in wait status seq = %s", pkg.seq)
+			log.Errorf("channel is not in wait status seq = %d", pkg.seq)
 		}
 	}
 }
@@ -101,19 +102,23 @@ func (r *RpcProxy) handleNodeResponse(msg []byte, seq uint32) {
 	}
 }
 
-func (r *RpcProxy) handleProcessReqMsg(pkg *packet) {
-	// req msg
+func (r *RpcProxy) handleProcessReqMsg(pkt *packet) {
 	reqMsg := &xgame.ReqMessage{}
-	err := proto.Unmarshal(pkg.payload, reqMsg)
+	err := proto.Unmarshal(pkt.payload, reqMsg)
 	if err != nil {
-		log.Errorf("Unmarsha error =%v", err)
+		log.Errorf("Unmarsha error = %v", err)
 		return
 	}
-	err = processDispatcher.DispatchMsg(pkg.asProcessReqMsg(), r)
+	if pkt.isCall() {
+		err = processDispatcher.DispatchCallMsg(pkt.asProcessReqMsg(), r)
+	} else {
+		err = processDispatcher.DispatchCastMsg(pkt.asProcessReqMsg())
+	}
 	if err != nil {
-		log.Errorf("handle actor msg error =%v", err)
+		log.Errorf("handle actor msg error = %v", err)
 		return
 	}
+
 }
 
 func (r *RpcProxy) NextSeq() uint32 {
@@ -137,7 +142,8 @@ func (r *RpcProxy) getRegChan(seq uint32) chan iface.IRpcReplyMsg {
 
 func (r *RpcProxy) GetRemoteHost() string {
 	if r.remoteHost == "" {
-		r.remoteHost = r.conn.GetRemoteAddress()
+		remoteAddr := r.conn.GetRemoteAddress()
+		r.remoteHost = strings.Split(remoteAddr, ":")[0]
 	}
 	return r.remoteHost
 }

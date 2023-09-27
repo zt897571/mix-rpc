@@ -15,11 +15,14 @@ proto:
 	protoc --gogoslick_out=./golang/proto -I=proto ./proto/*.proto
 
 test:
-	cd  erlang && rebar3 ct && cd ../
+	cd erlang && rebar3 ct && cd ../
+	cd golang && go test -gcflags=all=-l -v ./... -cover
+
+golang_test:
 	cd golang && go test -gcflags=all=-l -v ./... -cover
 
 clean_win:
 	if exist erlang/_build/ (rd /s /q erlang\_build\)
 
-.PHONY: erlang golang proto test clean_win
+.PHONY: erlang golang proto test clean_win golang_test
 

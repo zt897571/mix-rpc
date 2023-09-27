@@ -54,13 +54,19 @@
 -export_type([]).
 
 %% message types
+-type process_msg() :: #process_msg{}.
+
+-type mfa() :: #mfa{}.
+
+-type rpc_params() :: #rpc_params{}.
+
 -type req_message() :: #req_message{}.
 
 -type reply_message() :: #reply_message{}.
 
--export_type(['req_message'/0, 'reply_message'/0]).
--type '$msg_name'() :: req_message | reply_message.
--type '$msg'() :: req_message() | reply_message().
+-export_type(['process_msg'/0, 'mfa'/0, 'rpc_params'/0, 'req_message'/0, 'reply_message'/0]).
+-type '$msg_name'() :: process_msg | mfa | rpc_params | req_message | reply_message.
+-type '$msg'() :: process_msg() | mfa() | rpc_params() | req_message() | reply_message().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -spec encode_msg('$msg'()) -> binary().
@@ -78,21 +84,25 @@ encode_msg(Msg, MsgName, Opts) ->
     end,
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
+        process_msg -> encode_msg_process_msg(id(Msg, TrUserData), TrUserData);
+        mfa -> encode_msg_mfa(id(Msg, TrUserData), TrUserData);
+        rpc_params -> encode_msg_rpc_params(id(Msg, TrUserData), TrUserData);
         req_message -> encode_msg_req_message(id(Msg, TrUserData), TrUserData);
         reply_message -> encode_msg_reply_message(id(Msg, TrUserData), TrUserData)
     end.
 
 
-encode_msg_req_message(Msg, TrUserData) -> encode_msg_req_message(Msg, <<>>, TrUserData).
+encode_msg_process_msg(Msg, TrUserData) -> encode_msg_process_msg(Msg, <<>>, TrUserData).
 
 
-encode_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName = F4, payload = F5}, Bin, TrUserData) ->
+encode_msg_process_msg(#process_msg{source = F1, target = F2, params = F3}, Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
             true ->
                 begin
                     TrF1 = id(F1, TrUserData),
-                    if TrF1 =:= 0 -> Bin;
-                       true -> e_varint(TrF1, <<Bin/binary, 8>>, TrUserData)
+                    case iolist_size(TrF1) of
+                        0 -> Bin;
+                        _ -> e_type_bytes(TrF1, <<Bin/binary, 10>>, TrUserData)
                     end
                 end
          end,
@@ -106,33 +116,94 @@ encode_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName 
                     end
                 end
          end,
-    B3 = if F3 == undefined -> B2;
-            true ->
-                begin
-                    TrF3 = id(F3, TrUserData),
-                    case iolist_size(TrF3) of
-                        0 -> B2;
-                        _ -> e_type_bytes(TrF3, <<B2/binary, 26>>, TrUserData)
-                    end
-                end
-         end,
-    B4 = if F4 == undefined -> B3;
-            true ->
-                begin
-                    TrF4 = id(F4, TrUserData),
-                    case is_empty_string(TrF4) of
-                        true -> B3;
-                        false -> e_type_string(TrF4, <<B3/binary, 34>>, TrUserData)
-                    end
-                end
-         end,
-    if F5 == undefined -> B4;
+    if F3 == undefined -> B2;
        true ->
            begin
-               TrF5 = id(F5, TrUserData),
-               case iolist_size(TrF5) of
-                   0 -> B4;
-                   _ -> e_type_bytes(TrF5, <<B4/binary, 42>>, TrUserData)
+               TrF3 = id(F3, TrUserData),
+               if TrF3 =:= undefined -> B2;
+                  true -> e_mfield_process_msg_params(TrF3, <<B2/binary, 26>>, TrUserData)
+               end
+           end
+    end.
+
+encode_msg_mfa(Msg, TrUserData) -> encode_msg_mfa(Msg, <<>>, TrUserData).
+
+
+encode_msg_mfa(#mfa{module = F1, function = F2, args = F3}, Bin, TrUserData) ->
+    B1 = if F1 == undefined -> Bin;
+            true ->
+                begin
+                    TrF1 = id(F1, TrUserData),
+                    case is_empty_string(TrF1) of
+                        true -> Bin;
+                        false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                    end
+                end
+         end,
+    B2 = if F2 == undefined -> B1;
+            true ->
+                begin
+                    TrF2 = id(F2, TrUserData),
+                    case is_empty_string(TrF2) of
+                        true -> B1;
+                        false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+                    end
+                end
+         end,
+    if F3 == undefined -> B2;
+       true ->
+           begin
+               TrF3 = id(F3, TrUserData),
+               if TrF3 =:= undefined -> B2;
+                  true -> e_mfield_mfa_args(TrF3, <<B2/binary, 26>>, TrUserData)
+               end
+           end
+    end.
+
+encode_msg_rpc_params(Msg, TrUserData) -> encode_msg_rpc_params(Msg, <<>>, TrUserData).
+
+
+encode_msg_rpc_params(#rpc_params{msgName = F1, payload = F2}, Bin, TrUserData) ->
+    B1 = if F1 == undefined -> Bin;
+            true ->
+                begin
+                    TrF1 = id(F1, TrUserData),
+                    case is_empty_string(TrF1) of
+                        true -> Bin;
+                        false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                    end
+                end
+         end,
+    if F2 == undefined -> B1;
+       true ->
+           begin
+               TrF2 = id(F2, TrUserData),
+               case iolist_size(TrF2) of
+                   0 -> B1;
+                   _ -> e_type_bytes(TrF2, <<B1/binary, 18>>, TrUserData)
+               end
+           end
+    end.
+
+encode_msg_req_message(Msg, TrUserData) -> encode_msg_req_message(Msg, <<>>, TrUserData).
+
+
+encode_msg_req_message(#req_message{node_msg = F1, process_msg = F2}, Bin, TrUserData) ->
+    B1 = if F1 == undefined -> Bin;
+            true ->
+                begin
+                    TrF1 = id(F1, TrUserData),
+                    if TrF1 =:= undefined -> Bin;
+                       true -> e_mfield_req_message_node_msg(TrF1, <<Bin/binary, 10>>, TrUserData)
+                    end
+                end
+         end,
+    if F2 == undefined -> B1;
+       true ->
+           begin
+               TrF2 = id(F2, TrUserData),
+               if TrF2 =:= undefined -> B1;
+                  true -> e_mfield_req_message_process_msg(TrF2, <<B1/binary, 18>>, TrUserData)
                end
            end
     end.
@@ -140,13 +211,14 @@ encode_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName 
 encode_msg_reply_message(Msg, TrUserData) -> encode_msg_reply_message(Msg, <<>>, TrUserData).
 
 
-encode_msg_reply_message(#reply_message{seq = F1, target = F2, msgName = F3, payload = F4, err_code = F5}, Bin, TrUserData) ->
+encode_msg_reply_message(#reply_message{msgName = F1, payload = F2, error = F3}, Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
             true ->
                 begin
                     TrF1 = id(F1, TrUserData),
-                    if TrF1 =:= 0 -> Bin;
-                       true -> e_varint(TrF1, <<Bin/binary, 8>>, TrUserData)
+                    case is_empty_string(TrF1) of
+                        true -> Bin;
+                        false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
                     end
                 end
          end,
@@ -160,36 +232,36 @@ encode_msg_reply_message(#reply_message{seq = F1, target = F2, msgName = F3, pay
                     end
                 end
          end,
-    B3 = if F3 == undefined -> B2;
-            true ->
-                begin
-                    TrF3 = id(F3, TrUserData),
-                    case is_empty_string(TrF3) of
-                        true -> B2;
-                        false -> e_type_string(TrF3, <<B2/binary, 26>>, TrUserData)
-                    end
-                end
-         end,
-    B4 = if F4 == undefined -> B3;
-            true ->
-                begin
-                    TrF4 = id(F4, TrUserData),
-                    case iolist_size(TrF4) of
-                        0 -> B3;
-                        _ -> e_type_bytes(TrF4, <<B3/binary, 34>>, TrUserData)
-                    end
-                end
-         end,
-    if F5 == undefined -> B4;
+    if F3 == undefined -> B2;
        true ->
            begin
-               TrF5 = id(F5, TrUserData),
-               case is_empty_string(TrF5) of
-                   true -> B4;
-                   false -> e_type_string(TrF5, <<B4/binary, 42>>, TrUserData)
+               TrF3 = id(F3, TrUserData),
+               case is_empty_string(TrF3) of
+                   true -> B2;
+                   false -> e_type_string(TrF3, <<B2/binary, 26>>, TrUserData)
                end
            end
     end.
+
+e_mfield_process_msg_params(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_rpc_params(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+e_mfield_mfa_args(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_rpc_params(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+e_mfield_req_message_node_msg(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_mfa(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+e_mfield_req_message_process_msg(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_process_msg(Msg, <<>>, TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
 
 -compile({nowarn_unused_function,e_type_sint/3}).
 e_type_sint(Value, Bin, _TrUserData) when Value >= 0 -> e_varint(Value * 2, Bin);
@@ -329,154 +401,323 @@ decode_msg_1_catch(Bin, MsgName, TrUserData) ->
     end.
 -endif.
 
+decode_msg_2_doit(process_msg, Bin, TrUserData) -> id(decode_msg_process_msg(Bin, TrUserData), TrUserData);
+decode_msg_2_doit(mfa, Bin, TrUserData) -> id(decode_msg_mfa(Bin, TrUserData), TrUserData);
+decode_msg_2_doit(rpc_params, Bin, TrUserData) -> id(decode_msg_rpc_params(Bin, TrUserData), TrUserData);
 decode_msg_2_doit(req_message, Bin, TrUserData) -> id(decode_msg_req_message(Bin, TrUserData), TrUserData);
 decode_msg_2_doit(reply_message, Bin, TrUserData) -> id(decode_msg_reply_message(Bin, TrUserData), TrUserData).
 
 
 
-decode_msg_req_message(Bin, TrUserData) -> dfp_read_field_def_req_message(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), id(<<>>, TrUserData), id([], TrUserData), id(<<>>, TrUserData), TrUserData).
+decode_msg_process_msg(Bin, TrUserData) -> dfp_read_field_def_process_msg(Bin, 0, 0, 0, id(<<>>, TrUserData), id(<<>>, TrUserData), id(undefined, TrUserData), TrUserData).
 
-dfp_read_field_def_req_message(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_seq(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_req_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_source(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_req_message(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_target(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_req_message(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_msgName(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_req_message(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_req_message_payload(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_req_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) -> #req_message{seq = F@_1, source = F@_2, target = F@_3, msgName = F@_4, payload = F@_5};
-dfp_read_field_def_req_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dg_read_field_def_req_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+dfp_read_field_def_process_msg(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_process_msg_source(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_process_msg(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_process_msg_target(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_process_msg(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_process_msg_params(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_process_msg(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #process_msg{source = F@_1, target = F@_2, params = F@_3};
+dfp_read_field_def_process_msg(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dg_read_field_def_process_msg(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-dg_read_field_def_req_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 32 - 7 -> dg_read_field_def_req_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dg_read_field_def_req_message(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+dg_read_field_def_process_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> dg_read_field_def_process_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+dg_read_field_def_process_msg(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        8 -> d_field_req_message_seq(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        18 -> d_field_req_message_source(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        26 -> d_field_req_message_target(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        34 -> d_field_req_message_msgName(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        42 -> d_field_req_message_payload(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        10 -> d_field_process_msg_source(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        18 -> d_field_process_msg_target(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        26 -> d_field_process_msg_params(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> skip_varint_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                1 -> skip_64_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                2 -> skip_length_delimited_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                3 -> skip_group_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                5 -> skip_32_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData)
+                0 -> skip_varint_process_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> skip_64_process_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> skip_length_delimited_process_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> skip_group_process_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> skip_32_process_msg(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
             end
     end;
-dg_read_field_def_req_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) -> #req_message{seq = F@_1, source = F@_2, target = F@_3, msgName = F@_4, payload = F@_5}.
+dg_read_field_def_process_msg(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #process_msg{source = F@_1, target = F@_2, params = F@_3}.
 
-d_field_req_message_seq(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_seq(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_req_message_seq(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
-    dfp_read_field_def_req_message(RestF, 0, 0, F, NewFValue, F@_2, F@_3, F@_4, F@_5, TrUserData).
-
-d_field_req_message_source(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_source(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_req_message_source(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, F@_4, F@_5, TrUserData) ->
+d_field_process_msg_source(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_process_msg_source(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_process_msg_source(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, NewFValue, F@_3, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_process_msg(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
 
-d_field_req_message_target(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_target(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_req_message_target(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, F@_4, F@_5, TrUserData) ->
+d_field_process_msg_target(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_process_msg_target(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_process_msg_target(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, F@_2, NewFValue, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_process_msg(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
 
-d_field_req_message_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_req_message_msgName(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, _, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
-    dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, F@_2, F@_3, NewFValue, F@_5, TrUserData).
+d_field_process_msg_params(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_process_msg_params(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_process_msg_params(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id(decode_msg_rpc_params(Bs, TrUserData), TrUserData), Rest2} end,
+    dfp_read_field_def_process_msg(RestF,
+                                   0,
+                                   0,
+                                   F,
+                                   F@_1,
+                                   F@_2,
+                                   if Prev == undefined -> NewFValue;
+                                      true -> merge_msg_rpc_params(Prev, NewFValue, TrUserData)
+                                   end,
+                                   TrUserData).
 
-d_field_req_message_payload(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_req_message_payload(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_req_message_payload(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    dfp_read_field_def_req_message(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, NewFValue, TrUserData).
+skip_varint_process_msg(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> skip_varint_process_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+skip_varint_process_msg(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_process_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_varint_req_message(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> skip_varint_req_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-skip_varint_req_message(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
-
-skip_length_delimited_req_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> skip_length_delimited_req_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-skip_length_delimited_req_message(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+skip_length_delimited_process_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> skip_length_delimited_process_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+skip_length_delimited_process_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_req_message(Rest2, 0, 0, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_process_msg(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_group_req_message(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+skip_group_process_msg(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_req_message(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_process_msg(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
 
-skip_32_req_message(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+skip_32_process_msg(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_process_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_64_req_message(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+skip_64_process_msg(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_process_msg(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-decode_msg_reply_message(Bin, TrUserData) -> dfp_read_field_def_reply_message(Bin, 0, 0, 0, id(0, TrUserData), id(<<>>, TrUserData), id([], TrUserData), id(<<>>, TrUserData), id([], TrUserData), TrUserData).
+decode_msg_mfa(Bin, TrUserData) -> dfp_read_field_def_mfa(Bin, 0, 0, 0, id([], TrUserData), id([], TrUserData), id(undefined, TrUserData), TrUserData).
 
-dfp_read_field_def_reply_message(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_seq(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_reply_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_target(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_reply_message(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_msgName(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_reply_message(<<34, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_payload(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_reply_message(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_reply_message_err_code(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dfp_read_field_def_reply_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) -> #reply_message{seq = F@_1, target = F@_2, msgName = F@_3, payload = F@_4, err_code = F@_5};
-dfp_read_field_def_reply_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dg_read_field_def_reply_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+dfp_read_field_def_mfa(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_mfa_module(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_mfa(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_mfa_function(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_mfa(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_mfa_args(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_mfa(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #mfa{module = F@_1, function = F@_2, args = F@_3};
+dfp_read_field_def_mfa(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dg_read_field_def_mfa(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-dg_read_field_def_reply_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 32 - 7 -> dg_read_field_def_reply_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-dg_read_field_def_reply_message(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+dg_read_field_def_mfa(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> dg_read_field_def_mfa(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+dg_read_field_def_mfa(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        8 -> d_field_reply_message_seq(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        18 -> d_field_reply_message_target(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        26 -> d_field_reply_message_msgName(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        34 -> d_field_reply_message_payload(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-        42 -> d_field_reply_message_err_code(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        10 -> d_field_mfa_module(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        18 -> d_field_mfa_function(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        26 -> d_field_mfa_args(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> skip_varint_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                1 -> skip_64_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                2 -> skip_length_delimited_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                3 -> skip_group_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-                5 -> skip_32_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData)
+                0 -> skip_varint_mfa(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> skip_64_mfa(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> skip_length_delimited_mfa(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> skip_group_mfa(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> skip_32_mfa(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
             end
     end;
-dg_read_field_def_reply_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) -> #reply_message{seq = F@_1, target = F@_2, msgName = F@_3, payload = F@_4, err_code = F@_5}.
+dg_read_field_def_mfa(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #mfa{module = F@_1, function = F@_2, args = F@_3}.
 
-d_field_reply_message_seq(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_seq(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_reply_message_seq(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = {id((X bsl N + Acc) band 4294967295, TrUserData), Rest},
-    dfp_read_field_def_reply_message(RestF, 0, 0, F, NewFValue, F@_2, F@_3, F@_4, F@_5, TrUserData).
-
-d_field_reply_message_target(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_target(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_reply_message_target(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, F@_4, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, NewFValue, F@_3, F@_4, F@_5, TrUserData).
-
-d_field_reply_message_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_reply_message_msgName(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, F@_4, F@_5, TrUserData) ->
+d_field_mfa_module(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_mfa_module(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_mfa_module(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
-    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, F@_2, NewFValue, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_mfa(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
 
-d_field_reply_message_payload(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_payload(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_reply_message_payload(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, _, F@_5, TrUserData) ->
-    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
-    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, F@_2, F@_3, NewFValue, F@_5, TrUserData).
-
-d_field_reply_message_err_code(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_reply_message_err_code(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-d_field_reply_message_err_code(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+d_field_mfa_function(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_mfa_function(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_mfa_function(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
-    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, NewFValue, TrUserData).
+    dfp_read_field_def_mfa(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
 
-skip_varint_reply_message(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> skip_varint_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-skip_varint_reply_message(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+d_field_mfa_args(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_mfa_args(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_mfa_args(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id(decode_msg_rpc_params(Bs, TrUserData), TrUserData), Rest2} end,
+    dfp_read_field_def_mfa(RestF,
+                           0,
+                           0,
+                           F,
+                           F@_1,
+                           F@_2,
+                           if Prev == undefined -> NewFValue;
+                              true -> merge_msg_rpc_params(Prev, NewFValue, TrUserData)
+                           end,
+                           TrUserData).
 
-skip_length_delimited_reply_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> skip_length_delimited_reply_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
-skip_length_delimited_reply_message(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+skip_varint_mfa(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> skip_varint_mfa(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+skip_varint_mfa(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_mfa(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+skip_length_delimited_mfa(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> skip_length_delimited_mfa(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+skip_length_delimited_mfa(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_reply_message(Rest2, 0, 0, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_mfa(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_group_reply_message(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
+skip_group_mfa(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_reply_message(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+    dfp_read_field_def_mfa(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
 
-skip_32_reply_message(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+skip_32_mfa(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_mfa(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
-skip_64_reply_message(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+skip_64_mfa(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_mfa(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+decode_msg_rpc_params(Bin, TrUserData) -> dfp_read_field_def_rpc_params(Bin, 0, 0, 0, id([], TrUserData), id(<<>>, TrUserData), TrUserData).
+
+dfp_read_field_def_rpc_params(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_rpc_params_msgName(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+dfp_read_field_def_rpc_params(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_rpc_params_payload(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+dfp_read_field_def_rpc_params(<<>>, 0, 0, _, F@_1, F@_2, _) -> #rpc_params{msgName = F@_1, payload = F@_2};
+dfp_read_field_def_rpc_params(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dg_read_field_def_rpc_params(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+dg_read_field_def_rpc_params(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> dg_read_field_def_rpc_params(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+dg_read_field_def_rpc_params(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> d_field_rpc_params_msgName(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> d_field_rpc_params_payload(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> skip_varint_rpc_params(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> skip_64_rpc_params(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> skip_length_delimited_rpc_params(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> skip_group_rpc_params(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> skip_32_rpc_params(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+dg_read_field_def_rpc_params(<<>>, 0, 0, _, F@_1, F@_2, _) -> #rpc_params{msgName = F@_1, payload = F@_2}.
+
+d_field_rpc_params_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_rpc_params_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+d_field_rpc_params_msgName(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    dfp_read_field_def_rpc_params(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+d_field_rpc_params_payload(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_rpc_params_payload(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+d_field_rpc_params_payload(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    dfp_read_field_def_rpc_params(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+
+skip_varint_rpc_params(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> skip_varint_rpc_params(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+skip_varint_rpc_params(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_rpc_params(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+skip_length_delimited_rpc_params(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> skip_length_delimited_rpc_params(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+skip_length_delimited_rpc_params(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    dfp_read_field_def_rpc_params(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+skip_group_rpc_params(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    dfp_read_field_def_rpc_params(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+skip_32_rpc_params(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_rpc_params(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+skip_64_rpc_params(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_rpc_params(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+decode_msg_req_message(Bin, TrUserData) -> dfp_read_field_def_req_message(Bin, 0, 0, 0, id(undefined, TrUserData), id(undefined, TrUserData), TrUserData).
+
+dfp_read_field_def_req_message(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_req_message_node_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+dfp_read_field_def_req_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_req_message_process_msg(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+dfp_read_field_def_req_message(<<>>, 0, 0, _, F@_1, F@_2, _) -> #req_message{node_msg = F@_1, process_msg = F@_2};
+dfp_read_field_def_req_message(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dg_read_field_def_req_message(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+dg_read_field_def_req_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> dg_read_field_def_req_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+dg_read_field_def_req_message(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> d_field_req_message_node_msg(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> d_field_req_message_process_msg(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> skip_varint_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> skip_64_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> skip_length_delimited_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> skip_group_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> skip_32_req_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+dg_read_field_def_req_message(<<>>, 0, 0, _, F@_1, F@_2, _) -> #req_message{node_msg = F@_1, process_msg = F@_2}.
+
+d_field_req_message_node_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_req_message_node_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+d_field_req_message_node_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, Prev, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id(decode_msg_mfa(Bs, TrUserData), TrUserData), Rest2} end,
+    dfp_read_field_def_req_message(RestF,
+                                   0,
+                                   0,
+                                   F,
+                                   if Prev == undefined -> NewFValue;
+                                      true -> merge_msg_mfa(Prev, NewFValue, TrUserData)
+                                   end,
+                                   F@_2,
+                                   TrUserData).
+
+d_field_req_message_process_msg(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_req_message_process_msg(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+d_field_req_message_process_msg(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id(decode_msg_process_msg(Bs, TrUserData), TrUserData), Rest2} end,
+    dfp_read_field_def_req_message(RestF,
+                                   0,
+                                   0,
+                                   F,
+                                   F@_1,
+                                   if Prev == undefined -> NewFValue;
+                                      true -> merge_msg_process_msg(Prev, NewFValue, TrUserData)
+                                   end,
+                                   TrUserData).
+
+skip_varint_req_message(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> skip_varint_req_message(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+skip_varint_req_message(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+skip_length_delimited_req_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> skip_length_delimited_req_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+skip_length_delimited_req_message(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    dfp_read_field_def_req_message(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+skip_group_req_message(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    dfp_read_field_def_req_message(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+skip_32_req_message(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+skip_64_req_message(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_req_message(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+decode_msg_reply_message(Bin, TrUserData) -> dfp_read_field_def_reply_message(Bin, 0, 0, 0, id([], TrUserData), id(<<>>, TrUserData), id([], TrUserData), TrUserData).
+
+dfp_read_field_def_reply_message(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_reply_message_msgName(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_reply_message(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_reply_message_payload(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_reply_message(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> d_field_reply_message_error(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+dfp_read_field_def_reply_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #reply_message{msgName = F@_1, payload = F@_2, error = F@_3};
+dfp_read_field_def_reply_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dg_read_field_def_reply_message(Other, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+dg_read_field_def_reply_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 32 - 7 -> dg_read_field_def_reply_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+dg_read_field_def_reply_message(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> d_field_reply_message_msgName(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        18 -> d_field_reply_message_payload(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        26 -> d_field_reply_message_error(Rest, 0, 0, 0, F@_1, F@_2, F@_3, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> skip_varint_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                1 -> skip_64_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                2 -> skip_length_delimited_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                3 -> skip_group_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData);
+                5 -> skip_32_reply_message(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, TrUserData)
+            end
+    end;
+dg_read_field_def_reply_message(<<>>, 0, 0, _, F@_1, F@_2, F@_3, _) -> #reply_message{msgName = F@_1, payload = F@_2, error = F@_3}.
+
+d_field_reply_message_msgName(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_reply_message_msgName(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_reply_message_msgName(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    dfp_read_field_def_reply_message(RestF, 0, 0, F, NewFValue, F@_2, F@_3, TrUserData).
+
+d_field_reply_message_payload(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_reply_message_payload(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_reply_message_payload(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, F@_3, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, NewFValue, F@_3, TrUserData).
+
+d_field_reply_message_error(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> d_field_reply_message_error(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+d_field_reply_message_error(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    dfp_read_field_def_reply_message(RestF, 0, 0, F, F@_1, F@_2, NewFValue, TrUserData).
+
+skip_varint_reply_message(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> skip_varint_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData);
+skip_varint_reply_message(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+skip_length_delimited_reply_message(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) when N < 57 -> skip_length_delimited_reply_message(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, TrUserData);
+skip_length_delimited_reply_message(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    dfp_read_field_def_reply_message(Rest2, 0, 0, F, F@_1, F@_2, F@_3, TrUserData).
+
+skip_group_reply_message(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    dfp_read_field_def_reply_message(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, TrUserData).
+
+skip_32_reply_message(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
+
+skip_64_reply_message(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> dfp_read_field_def_reply_message(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
 read_group(Bin, FieldNum) ->
     {NumBytes, EndTagLen} = read_gr_b(Bin, 0, 0, 0, 0, FieldNum),
@@ -544,17 +785,16 @@ merge_msgs(Prev, New, Opts) when element(1, Prev) =:= element(1, New), is_list(O
 merge_msgs(Prev, New, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
+        process_msg -> merge_msg_process_msg(Prev, New, TrUserData);
+        mfa -> merge_msg_mfa(Prev, New, TrUserData);
+        rpc_params -> merge_msg_rpc_params(Prev, New, TrUserData);
         req_message -> merge_msg_req_message(Prev, New, TrUserData);
         reply_message -> merge_msg_reply_message(Prev, New, TrUserData)
     end.
 
--compile({nowarn_unused_function,merge_msg_req_message/3}).
-merge_msg_req_message(#req_message{seq = PFseq, source = PFsource, target = PFtarget, msgName = PFmsgName, payload = PFpayload}, #req_message{seq = NFseq, source = NFsource, target = NFtarget, msgName = NFmsgName, payload = NFpayload}, _) ->
-    #req_message{seq =
-                     if NFseq =:= undefined -> PFseq;
-                        true -> NFseq
-                     end,
-                 source =
+-compile({nowarn_unused_function,merge_msg_process_msg/3}).
+merge_msg_process_msg(#process_msg{source = PFsource, target = PFtarget, params = PFparams}, #process_msg{source = NFsource, target = NFtarget, params = NFparams}, TrUserData) ->
+    #process_msg{source =
                      if NFsource =:= undefined -> PFsource;
                         true -> NFsource
                      end,
@@ -562,27 +802,55 @@ merge_msg_req_message(#req_message{seq = PFseq, source = PFsource, target = PFta
                      if NFtarget =:= undefined -> PFtarget;
                         true -> NFtarget
                      end,
-                 msgName =
-                     if NFmsgName =:= undefined -> PFmsgName;
-                        true -> NFmsgName
+                 params =
+                     if PFparams /= undefined, NFparams /= undefined -> merge_msg_rpc_params(PFparams, NFparams, TrUserData);
+                        PFparams == undefined -> NFparams;
+                        NFparams == undefined -> PFparams
+                     end}.
+
+-compile({nowarn_unused_function,merge_msg_mfa/3}).
+merge_msg_mfa(#mfa{module = PFmodule, function = PFfunction, args = PFargs}, #mfa{module = NFmodule, function = NFfunction, args = NFargs}, TrUserData) ->
+    #mfa{module =
+             if NFmodule =:= undefined -> PFmodule;
+                true -> NFmodule
+             end,
+         function =
+             if NFfunction =:= undefined -> PFfunction;
+                true -> NFfunction
+             end,
+         args =
+             if PFargs /= undefined, NFargs /= undefined -> merge_msg_rpc_params(PFargs, NFargs, TrUserData);
+                PFargs == undefined -> NFargs;
+                NFargs == undefined -> PFargs
+             end}.
+
+-compile({nowarn_unused_function,merge_msg_rpc_params/3}).
+merge_msg_rpc_params(#rpc_params{msgName = PFmsgName, payload = PFpayload}, #rpc_params{msgName = NFmsgName, payload = NFpayload}, _) ->
+    #rpc_params{msgName =
+                    if NFmsgName =:= undefined -> PFmsgName;
+                       true -> NFmsgName
+                    end,
+                payload =
+                    if NFpayload =:= undefined -> PFpayload;
+                       true -> NFpayload
+                    end}.
+
+-compile({nowarn_unused_function,merge_msg_req_message/3}).
+merge_msg_req_message(#req_message{node_msg = PFnode_msg, process_msg = PFprocess_msg}, #req_message{node_msg = NFnode_msg, process_msg = NFprocess_msg}, TrUserData) ->
+    #req_message{node_msg =
+                     if PFnode_msg /= undefined, NFnode_msg /= undefined -> merge_msg_mfa(PFnode_msg, NFnode_msg, TrUserData);
+                        PFnode_msg == undefined -> NFnode_msg;
+                        NFnode_msg == undefined -> PFnode_msg
                      end,
-                 payload =
-                     if NFpayload =:= undefined -> PFpayload;
-                        true -> NFpayload
+                 process_msg =
+                     if PFprocess_msg /= undefined, NFprocess_msg /= undefined -> merge_msg_process_msg(PFprocess_msg, NFprocess_msg, TrUserData);
+                        PFprocess_msg == undefined -> NFprocess_msg;
+                        NFprocess_msg == undefined -> PFprocess_msg
                      end}.
 
 -compile({nowarn_unused_function,merge_msg_reply_message/3}).
-merge_msg_reply_message(#reply_message{seq = PFseq, target = PFtarget, msgName = PFmsgName, payload = PFpayload, err_code = PFerr_code}, #reply_message{seq = NFseq, target = NFtarget, msgName = NFmsgName, payload = NFpayload, err_code = NFerr_code},
-                        _) ->
-    #reply_message{seq =
-                       if NFseq =:= undefined -> PFseq;
-                          true -> NFseq
-                       end,
-                   target =
-                       if NFtarget =:= undefined -> PFtarget;
-                          true -> NFtarget
-                       end,
-                   msgName =
+merge_msg_reply_message(#reply_message{msgName = PFmsgName, payload = PFpayload, error = PFerror}, #reply_message{msgName = NFmsgName, payload = NFpayload, error = NFerror}, _) ->
+    #reply_message{msgName =
                        if NFmsgName =:= undefined -> PFmsgName;
                           true -> NFmsgName
                        end,
@@ -590,9 +858,9 @@ merge_msg_reply_message(#reply_message{seq = PFseq, target = PFtarget, msgName =
                        if NFpayload =:= undefined -> PFpayload;
                           true -> NFpayload
                        end,
-                   err_code =
-                       if NFerr_code =:= undefined -> PFerr_code;
-                          true -> NFerr_code
+                   error =
+                       if NFerror =:= undefined -> PFerror;
+                          true -> NFerror
                        end}.
 
 
@@ -606,59 +874,83 @@ verify_msg(X, _Opts) -> mk_type_error(not_a_known_message, X, []).
 verify_msg(Msg, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
+        process_msg -> v_msg_process_msg(Msg, [MsgName], TrUserData);
+        mfa -> v_msg_mfa(Msg, [MsgName], TrUserData);
+        rpc_params -> v_msg_rpc_params(Msg, [MsgName], TrUserData);
         req_message -> v_msg_req_message(Msg, [MsgName], TrUserData);
         reply_message -> v_msg_reply_message(Msg, [MsgName], TrUserData);
         _ -> mk_type_error(not_a_known_message, Msg, [])
     end.
 
 
--compile({nowarn_unused_function,v_msg_req_message/3}).
--dialyzer({nowarn_function,v_msg_req_message/3}).
-v_msg_req_message(#req_message{seq = F1, source = F2, target = F3, msgName = F4, payload = F5}, Path, TrUserData) ->
+-compile({nowarn_unused_function,v_msg_process_msg/3}).
+-dialyzer({nowarn_function,v_msg_process_msg/3}).
+v_msg_process_msg(#process_msg{source = F1, target = F2, params = F3}, Path, TrUserData) ->
     if F1 == undefined -> ok;
-       true -> v_type_uint32(F1, [seq | Path], TrUserData)
+       true -> v_type_bytes(F1, [source | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
-       true -> v_type_bytes(F2, [source | Path], TrUserData)
+       true -> v_type_bytes(F2, [target | Path], TrUserData)
     end,
     if F3 == undefined -> ok;
-       true -> v_type_bytes(F3, [target | Path], TrUserData)
+       true -> v_msg_rpc_params(F3, [params | Path], TrUserData)
     end,
-    if F4 == undefined -> ok;
-       true -> v_type_string(F4, [msgName | Path], TrUserData)
+    ok;
+v_msg_process_msg(X, Path, _TrUserData) -> mk_type_error({expected_msg, process_msg}, X, Path).
+
+-compile({nowarn_unused_function,v_msg_mfa/3}).
+-dialyzer({nowarn_function,v_msg_mfa/3}).
+v_msg_mfa(#mfa{module = F1, function = F2, args = F3}, Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_type_string(F1, [module | Path], TrUserData)
     end,
-    if F5 == undefined -> ok;
-       true -> v_type_bytes(F5, [payload | Path], TrUserData)
+    if F2 == undefined -> ok;
+       true -> v_type_string(F2, [function | Path], TrUserData)
+    end,
+    if F3 == undefined -> ok;
+       true -> v_msg_rpc_params(F3, [args | Path], TrUserData)
+    end,
+    ok;
+v_msg_mfa(X, Path, _TrUserData) -> mk_type_error({expected_msg, mfa}, X, Path).
+
+-compile({nowarn_unused_function,v_msg_rpc_params/3}).
+-dialyzer({nowarn_function,v_msg_rpc_params/3}).
+v_msg_rpc_params(#rpc_params{msgName = F1, payload = F2}, Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_type_string(F1, [msgName | Path], TrUserData)
+    end,
+    if F2 == undefined -> ok;
+       true -> v_type_bytes(F2, [payload | Path], TrUserData)
+    end,
+    ok;
+v_msg_rpc_params(X, Path, _TrUserData) -> mk_type_error({expected_msg, rpc_params}, X, Path).
+
+-compile({nowarn_unused_function,v_msg_req_message/3}).
+-dialyzer({nowarn_function,v_msg_req_message/3}).
+v_msg_req_message(#req_message{node_msg = F1, process_msg = F2}, Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_msg_mfa(F1, [node_msg | Path], TrUserData)
+    end,
+    if F2 == undefined -> ok;
+       true -> v_msg_process_msg(F2, [process_msg | Path], TrUserData)
     end,
     ok;
 v_msg_req_message(X, Path, _TrUserData) -> mk_type_error({expected_msg, req_message}, X, Path).
 
 -compile({nowarn_unused_function,v_msg_reply_message/3}).
 -dialyzer({nowarn_function,v_msg_reply_message/3}).
-v_msg_reply_message(#reply_message{seq = F1, target = F2, msgName = F3, payload = F4, err_code = F5}, Path, TrUserData) ->
+v_msg_reply_message(#reply_message{msgName = F1, payload = F2, error = F3}, Path, TrUserData) ->
     if F1 == undefined -> ok;
-       true -> v_type_uint32(F1, [seq | Path], TrUserData)
+       true -> v_type_string(F1, [msgName | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
-       true -> v_type_bytes(F2, [target | Path], TrUserData)
+       true -> v_type_bytes(F2, [payload | Path], TrUserData)
     end,
     if F3 == undefined -> ok;
-       true -> v_type_string(F3, [msgName | Path], TrUserData)
-    end,
-    if F4 == undefined -> ok;
-       true -> v_type_bytes(F4, [payload | Path], TrUserData)
-    end,
-    if F5 == undefined -> ok;
-       true -> v_type_string(F5, [err_code | Path], TrUserData)
+       true -> v_type_string(F3, [error | Path], TrUserData)
     end,
     ok;
 v_msg_reply_message(X, Path, _TrUserData) -> mk_type_error({expected_msg, reply_message}, X, Path).
-
--compile({nowarn_unused_function,v_type_uint32/3}).
--dialyzer({nowarn_function,v_type_uint32/3}).
-v_type_uint32(N, _Path, _TrUserData) when 0 =< N, N =< 4294967295 -> ok;
-v_type_uint32(N, Path, _TrUserData) when is_integer(N) -> mk_type_error({value_out_of_range, uint32, unsigned, 32}, N, Path);
-v_type_uint32(X, Path, _TrUserData) -> mk_type_error({bad_integer, uint32, unsigned, 32}, X, Path).
 
 -compile({nowarn_unused_function,v_type_string/3}).
 -dialyzer({nowarn_function,v_type_string/3}).
@@ -715,27 +1007,29 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 
 
 get_msg_defs() ->
-    [{{msg, req_message},
-      [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-       #field{name = source, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
-       #field{name = target, fnum = 3, rnum = 4, type = bytes, occurrence = optional, opts = []},
-       #field{name = msgName, fnum = 4, rnum = 5, type = string, occurrence = optional, opts = []},
-       #field{name = payload, fnum = 5, rnum = 6, type = bytes, occurrence = optional, opts = []}]},
-     {{msg, reply_message},
-      [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
+    [{{msg, process_msg},
+      [#field{name = source, fnum = 1, rnum = 2, type = bytes, occurrence = optional, opts = []},
        #field{name = target, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
-       #field{name = msgName, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
-       #field{name = payload, fnum = 4, rnum = 5, type = bytes, occurrence = optional, opts = []},
-       #field{name = err_code, fnum = 5, rnum = 6, type = string, occurrence = optional, opts = []}]}].
+       #field{name = params, fnum = 3, rnum = 4, type = {msg, rpc_params}, occurrence = optional, opts = []}]},
+     {{msg, mfa},
+      [#field{name = module, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+       #field{name = function, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
+       #field{name = args, fnum = 3, rnum = 4, type = {msg, rpc_params}, occurrence = optional, opts = []}]},
+     {{msg, rpc_params}, [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []}]},
+     {{msg, req_message}, [#field{name = node_msg, fnum = 1, rnum = 2, type = {msg, mfa}, occurrence = optional, opts = []}, #field{name = process_msg, fnum = 2, rnum = 3, type = {msg, process_msg}, occurrence = optional, opts = []}]},
+     {{msg, reply_message},
+      [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+       #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
+       #field{name = error, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []}]}].
 
 
-get_msg_names() -> [req_message, reply_message].
+get_msg_names() -> [process_msg, mfa, rpc_params, req_message, reply_message].
 
 
 get_group_names() -> [].
 
 
-get_msg_or_group_names() -> [req_message, reply_message].
+get_msg_or_group_names() -> [process_msg, mfa, rpc_params, req_message, reply_message].
 
 
 get_enum_names() -> [].
@@ -752,18 +1046,20 @@ fetch_msg_def(MsgName) ->
 fetch_enum_def(EnumName) -> erlang:error({no_such_enum, EnumName}).
 
 
-find_msg_def(req_message) ->
-    [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
-     #field{name = source, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
-     #field{name = target, fnum = 3, rnum = 4, type = bytes, occurrence = optional, opts = []},
-     #field{name = msgName, fnum = 4, rnum = 5, type = string, occurrence = optional, opts = []},
-     #field{name = payload, fnum = 5, rnum = 6, type = bytes, occurrence = optional, opts = []}];
-find_msg_def(reply_message) ->
-    [#field{name = seq, fnum = 1, rnum = 2, type = uint32, occurrence = optional, opts = []},
+find_msg_def(process_msg) ->
+    [#field{name = source, fnum = 1, rnum = 2, type = bytes, occurrence = optional, opts = []},
      #field{name = target, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
-     #field{name = msgName, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []},
-     #field{name = payload, fnum = 4, rnum = 5, type = bytes, occurrence = optional, opts = []},
-     #field{name = err_code, fnum = 5, rnum = 6, type = string, occurrence = optional, opts = []}];
+     #field{name = params, fnum = 3, rnum = 4, type = {msg, rpc_params}, occurrence = optional, opts = []}];
+find_msg_def(mfa) ->
+    [#field{name = module, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+     #field{name = function, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []},
+     #field{name = args, fnum = 3, rnum = 4, type = {msg, rpc_params}, occurrence = optional, opts = []}];
+find_msg_def(rpc_params) -> [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []}];
+find_msg_def(req_message) -> [#field{name = node_msg, fnum = 1, rnum = 2, type = {msg, mfa}, occurrence = optional, opts = []}, #field{name = process_msg, fnum = 2, rnum = 3, type = {msg, process_msg}, occurrence = optional, opts = []}];
+find_msg_def(reply_message) ->
+    [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
+     #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
+     #field{name = error, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []}];
 find_msg_def(_) -> error.
 
 
@@ -822,11 +1118,17 @@ fqbins_to_service_and_rpc_name(S, R) -> error({gpb_error, {badservice_or_rpc, {S
 service_and_rpc_name_to_fqbins(S, R) -> error({gpb_error, {badservice_or_rpc, {S, R}}}).
 
 
+fqbin_to_msg_name(<<"xgame.process_msg">>) -> process_msg;
+fqbin_to_msg_name(<<"xgame.mfa">>) -> mfa;
+fqbin_to_msg_name(<<"xgame.rpc_params">>) -> rpc_params;
 fqbin_to_msg_name(<<"xgame.req_message">>) -> req_message;
 fqbin_to_msg_name(<<"xgame.reply_message">>) -> reply_message;
 fqbin_to_msg_name(E) -> error({gpb_error, {badmsg, E}}).
 
 
+msg_name_to_fqbin(process_msg) -> <<"xgame.process_msg">>;
+msg_name_to_fqbin(mfa) -> <<"xgame.mfa">>;
+msg_name_to_fqbin(rpc_params) -> <<"xgame.rpc_params">>;
 msg_name_to_fqbin(req_message) -> <<"xgame.req_message">>;
 msg_name_to_fqbin(reply_message) -> <<"xgame.reply_message">>;
 msg_name_to_fqbin(E) -> error({gpb_error, {badmsg, E}}).
@@ -867,7 +1169,7 @@ get_all_source_basenames() -> ["rpc.proto"].
 get_all_proto_names() -> ["rpc"].
 
 
-get_msg_containment("rpc") -> [reply_message, req_message];
+get_msg_containment("rpc") -> [mfa, process_msg, reply_message, req_message, rpc_params];
 get_msg_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
@@ -887,8 +1189,11 @@ get_enum_containment("rpc") -> [];
 get_enum_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
+get_proto_by_msg_name_as_fqbin(<<"xgame.mfa">>) -> "rpc";
+get_proto_by_msg_name_as_fqbin(<<"xgame.rpc_params">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(<<"xgame.req_message">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(<<"xgame.reply_message">>) -> "rpc";
+get_proto_by_msg_name_as_fqbin(<<"xgame.process_msg">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 

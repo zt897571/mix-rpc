@@ -10,6 +10,7 @@ import "errors"
 
 var TimeOutError = errors.New("timeout")
 var ChannelIsFull = errors.New("channel is full")
+var ChannelInvalid = errors.New("channel invalid")
 
 var PidFormatError = errors.New("pid format error")
 
@@ -28,3 +29,6 @@ var Panic = errors.New("function panic")
 
 var PacketFormatError = errors.New("packet format error")
 var LogicError = errors.New("logic error")
+
+var NodeNameFormatError = errors.New("node name format error")
+var RepeatedNode = errors.New("repeated node")

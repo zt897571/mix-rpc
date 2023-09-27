@@ -19,7 +19,7 @@ import (
 )
 
 func TestProcess(t *testing.T) {
-	convey.Convey("test process status", t, func() {
+	convey.Convey("rawProcessReqReplyer process status", t, func() {
 		hd := &testActor{}
 		pid, err := GetProcessMgr().CreateProcess(hd)
 		convey.ShouldEqual(err, convey.ShouldEqual, nil)
@@ -39,7 +39,7 @@ func TestProcessCall(t *testing.T) {
 		var wg sync.WaitGroup
 		goroutineCount := 5
 		wg.Add(goroutineCount)
-		// loop call
+		// loop callRemote
 		//go testCall(pid1, pid2, 10, t, &wg)
 		//go testCall(pid2, pid1, 10, t, &wg)
 		for i := 0; i < goroutineCount; i++ {
@@ -59,7 +59,7 @@ func prepareActor(t *testing.T) (iface.IPid, iface.IPid) {
 	convey.So(pid1, convey.ShouldNotEqual, nil)
 	convey.So(err, convey.ShouldEqual, nil)
 
-	// test create
+	// rawProcessReqReplyer create
 	pid2, err := GetProcessMgr().CreateProcess(actor2)
 	process2 := GetProcessMgr().GetProcess(pid2)
 	convey.So(process2, convey.ShouldNotEqual, nil)
@@ -73,7 +73,7 @@ func prepareActor(t *testing.T) (iface.IPid, iface.IPid) {
 }
 
 func testCall(sourcePid iface.IPid, targetPid iface.IPid, times int, t *testing.T, finishWg *sync.WaitGroup) {
-	convey.Convey("test call", t, func() {
+	convey.Convey("rawProcessReqReplyer callRemote", t, func() {
 		process := GetProcessMgr().GetProcess(sourcePid)
 		convey.So(process, convey.ShouldNotEqual, nil)
 
@@ -82,7 +82,7 @@ func testCall(sourcePid iface.IPid, targetPid iface.IPid, times int, t *testing.
 		wg.Add(times)
 		for i := 0; i < times; i++ {
 			err = process.asyncRun(func() {
-				convey.Convey("test call", t, func() {
+				convey.Convey("rawProcessReqReplyer callRemote", t, func() {
 					defer wg.Done()
 					req := &xgame.TestMsg{Rand: rand.Int31()}
 					err = process.Cast(targetPid, req)
@@ -131,7 +131,7 @@ func BenchmarkProcess_Call(b *testing.B) {
 }
 
 func TestProcess_Cast(t *testing.T) {
-	convey.Convey("test process cast", t, func() {
+	convey.Convey("rawProcessReqReplyer process cast", t, func() {
 		pid1, pid2 := prepareActor(t)
 		process1 := GetProcessMgr().GetProcess(pid1)
 		actor := GetProcessMgr().GetProcess(pid2).getActor().(*testActor)
@@ -140,7 +140,7 @@ func TestProcess_Cast(t *testing.T) {
 		wg.Add(times)
 		for i := 0; i < times; i++ {
 			err := process1.asyncRun(func() {
-				convey.Convey("test cast", t, func() {
+				convey.Convey("rawProcessReqReplyer cast", t, func() {
 					reqMsg := &xgame.TestMsg{Rand: rand.Int31()}
 					err := process1.Cast(pid2, reqMsg)
 					convey.So(err, convey.ShouldEqual, nil)
@@ -197,7 +197,7 @@ func (t *testActor) HandleCall(from iface.IPid, msg proto.Message) (proto.Messag
 
 func (t *testActor) checkFrom(from iface.IPid) {
 	if t.test != nil {
-		convey.Convey("test", t.test, func() {
+		convey.Convey("rawProcessReqReplyer", t.test, func() {
 			convey.So(from, convey.ShouldEqual, t.targetPid)
 		})
 	}

@@ -23,13 +23,12 @@ func NewRpcServer(addr string) *RpcServer {
 
 func (r *RpcServer) Start() error {
 	errChannel := make(chan error)
-	go func() {
-		r.server.Start(r, errChannel)
-	}()
+	go r.server.Start(r, errChannel)
 	return <-errChannel
 }
 
 func (r *RpcServer) OnNewConnection(connection iface2.IConnection) {
+	log.Infof("New Conneciton")
 	rpcProxy := NewRpcProxy()
 	connection.BindMsgHandler(rpcProxy)
 	go func() {

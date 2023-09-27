@@ -18,8 +18,10 @@ var ipaddress = fmt.Sprintf("localhost:%d", 9000)
 
 func init() {
 	echoServer = NewEchoServer(ipaddress)
-	go echoServer.Start()
-	time.Sleep(time.Millisecond * 500)
+	err := echoServer.Start()
+	if err != nil {
+		return
+	}
 }
 
 func TestClient_Connect(t *testing.T) {
