@@ -20,7 +20,7 @@ type IRpcProxy interface {
 	UnRegSeq(seq uint32)
 	GetRemoteHost() string
 	GetLocalHost() string
-	SendNodeMsg(seq uint32, isCall bool, msg *xgame.Mfa) error
+	SendNodeMsg(seq uint32, isCall bool, msg *xgame.PbMfa) error
 	SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error
 }
 

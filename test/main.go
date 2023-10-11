@@ -96,7 +96,8 @@ func nodecall(args []string) error {
 	if len(args) < 1 {
 		return error_code.ArgumentError
 	}
-	mfa, err := rpc.BuildMfa("test", "TestNodeCall", &xgame.TestMsg{Msg: args[0]})
+	//mfa, err := rpc.BuildMfa("test", "TestNodeCall", &xgame.TestMsg{Msg: args[0]})
+	mfa, err := rpc.BuildMfa("test", "test_node_call", &xgame.TestMsg{Msg: args[0]})
 	if err != nil {
 		return err
 	}

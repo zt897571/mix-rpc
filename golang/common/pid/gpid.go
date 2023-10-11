@@ -1,4 +1,4 @@
-// Package process -----------------------------
+// Package pid -----------------------------
 // @file      : gpid.go
 // @author    : zhangtuo
 // @contact   :
@@ -45,6 +45,7 @@ func (g *gPid) Encode() []byte {
 	for i, b := range []byte(g.nodeName) {
 		bin[7+i] = b
 	}
+	fmt.Println(bin)
 	return bin
 }
 

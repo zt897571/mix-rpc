@@ -30,8 +30,7 @@ func SetNodeName(nodeName string) error {
 type NodeName string
 
 func IsValidNodeName(name string) bool {
-	sp := strings.Split(name, nodeNameSep)
-	return len(sp) == 2
+	return len(strings.Split(name, nodeNameSep)) == 3
 }
 
 func (n NodeName) GetHost() string {

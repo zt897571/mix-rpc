@@ -181,7 +181,7 @@ func (r *RpcProxy) sendMsg(seq uint32, flag FlagType, msg proto.Message) error {
 	return r.conn.Send(msgBin)
 }
 
-func (r *RpcProxy) SendNodeMsg(seq uint32, isCall bool, mfa *xgame.Mfa) error {
+func (r *RpcProxy) SendNodeMsg(seq uint32, isCall bool, mfa *xgame.PbMfa) error {
 	flag := nodeCastFlag
 	if isCall {
 		flag = nodeCallFlag
@@ -224,11 +224,11 @@ func Connect(IpAddress string) (iface.IRpcProxy, error) {
 	return rpcProxy, nil
 }
 
-func NodeCast(proxy iface.IRpcProxy, mfa *xgame.Mfa) error {
+func NodeCast(proxy iface.IRpcProxy, mfa *xgame.PbMfa) error {
 	return proxy.SendNodeMsg(0, false, mfa)
 }
 
-func NodeCall(proxy iface.IRpcProxy, mfa *xgame.Mfa, timeout time.Duration) (proto.Message, error) {
+func NodeCall(proxy iface.IRpcProxy, mfa *xgame.PbMfa, timeout time.Duration) (proto.Message, error) {
 	seq := proxy.NextSeq()
 	replyChan := make(chan iface.IRpcReplyMsg, 1)
 	proxy.RegSeq(seq, replyChan)
@@ -245,7 +245,7 @@ func NodeCall(proxy iface.IRpcProxy, mfa *xgame.Mfa, timeout time.Duration) (pro
 	}
 }
 
-func BuildMfa(module string, function string, args proto.Message) (*xgame.Mfa, error) {
+func BuildMfa(module string, function string, args proto.Message) (*xgame.PbMfa, error) {
 	var argsBin []byte = nil
 	var err error
 	if args != nil {
@@ -254,7 +254,7 @@ func BuildMfa(module string, function string, args proto.Message) (*xgame.Mfa, e
 			return nil, err
 		}
 	}
-	return &xgame.Mfa{
+	return &xgame.PbMfa{
 		Module:   module,
 		Function: function,
 		Args: &xgame.RpcParams{

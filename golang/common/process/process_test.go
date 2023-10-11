@@ -35,7 +35,6 @@ func TestProcess(t *testing.T) {
 func TestProcessCall(t *testing.T) {
 	convey.Convey("TestProcessCall", t, func() {
 		pid1, pid2 := prepareActor(t)
-
 		var wg sync.WaitGroup
 		goroutineCount := 5
 		wg.Add(goroutineCount)

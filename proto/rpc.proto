@@ -5,9 +5,10 @@ message process_msg {
   bytes source = 1;  // 调用方
   bytes target = 2;  // 目标对象
   rpc_params params = 3;  //参数
+
 }
 
-message mfa {
+message pb_mfa {
   string module = 1;
   string function = 2;
   rpc_params args = 3;
@@ -20,7 +21,7 @@ message rpc_params {
 
 // 请求消息
 message req_message {
-  mfa  node_msg = 1;
+  pb_mfa  node_msg = 1;
   process_msg process_msg = 2;
 }
 
