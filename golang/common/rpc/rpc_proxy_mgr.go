@@ -68,7 +68,7 @@ func RegisterNodeMsg(module string, instance any) {
 	mhMap[module] = mp
 }
 
-func applyMfa(mfa *xgame.Mfa) (proto.Message, error) {
+func applyMfa(mfa *xgame.PbMfa) (proto.Message, error) {
 	var funcMap map[string]*utils.FuncDesc
 	var ok bool
 	if funcMap, ok = mhMap[mfa.Module]; !ok {
