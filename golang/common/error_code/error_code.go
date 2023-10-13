@@ -20,7 +20,7 @@ var ProcessReplyError = errors.New("process reply error")
 var ProcessNotRunning = errors.New("process not running")
 
 var RpcProxyNotFound = errors.New("rpc proxy not found")
-var RpcHostNotConnected = errors.New("host not connected")
+var RpcNodeNotConnected = errors.New("host not connected")
 
 var FunctionArgsCountError = errors.New("function agrs count error")
 var MfaError = errors.New("mfa error")
@@ -31,4 +31,5 @@ var PacketFormatError = errors.New("packet format error")
 var LogicError = errors.New("logic error")
 
 var NodeNameFormatError = errors.New("node name format error")
-var RepeatedNode = errors.New("repeated node")
+var NodeAlreadyInit = errors.New("node already init")
+var VerifyError = errors.New("verify cookie error")

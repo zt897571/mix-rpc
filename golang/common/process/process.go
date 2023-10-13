@@ -58,6 +58,9 @@ func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 }
 
 func (p *Process) Run() {
+	if p.status != Init {
+		return
+	}
 	defer p.OnStop()
 	p.actor.OnStart()
 	p.loop()

@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"context"
 	"errors"
 	"golang/common/error_code"
 	"golang/common/log"
@@ -11,15 +12,14 @@ import (
 )
 
 type TcpConnection struct {
-	conn          net.Conn
-	recvMsgNum    uint32
-	activeTime    int64
-	readChan      chan []byte
-	readChanStop  chan struct{}
-	writeChan     chan []byte
-	writeChanStop chan struct{}
-	config        *iface2.ConnectionConfig
-	msgHandler    iface2.INetMsgHandler
+	conn       net.Conn
+	recvMsgNum uint32
+	activeTime int64
+	readChan   chan []byte
+	writeChan  chan []byte
+	cancel     context.CancelFunc
+	config     *iface2.ConnectionConfig
+	msgHandler iface2.INetMsgHandler
 }
 
 var _ iface2.IConnection = (*TcpConnection)(nil)
@@ -29,13 +29,11 @@ func NewConnectionInfo(conn net.Conn, config *iface2.ConnectionConfig) *TcpConne
 		config = iface2.NewDefaultConnectionConfig()
 	}
 	ci := &TcpConnection{
-		conn:          conn,
-		activeTime:    time.Now().Unix(),
-		readChan:      make(chan []byte, config.ReadChanelSize),
-		readChanStop:  make(chan struct{}),
-		writeChan:     make(chan []byte, config.WriteChanelSize),
-		writeChanStop: make(chan struct{}),
-		config:        config,
+		conn:       conn,
+		activeTime: time.Now().Unix(),
+		readChan:   make(chan []byte, config.ReadChanelSize),
+		writeChan:  make(chan []byte, config.WriteChanelSize),
+		config:     config,
 	}
 	return ci
 }
@@ -47,25 +45,30 @@ func (ci *TcpConnection) ApplyOption(option ...iface2.ConnectionOption) {
 }
 
 func (ci *TcpConnection) Run() {
-	defer ci.OnClose()
-	go ci.handleLoop()
-	go ci.writeLoop()
+	if ci.cancel != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ci.cancel = cancel
+	defer ci.cancel()
+	go ci.handleLoop(ctx)
+	go ci.writeLoop(ctx)
 	ci.recv()
 }
 
-func (ci *TcpConnection) handleLoop() {
+func (ci *TcpConnection) handleLoop(ctx context.Context) {
 	for {
 		select {
 		case payload := <-ci.readChan:
 			ci.msgHandler.OnReceiveMsg(payload)
-		case <-ci.readChanStop:
+		case <-ctx.Done():
 			ci.msgHandler.OnDisconnected()
 			return
 		}
 	}
 }
 
-func (ci *TcpConnection) writeLoop() {
+func (ci *TcpConnection) writeLoop(ctx context.Context) {
 	for {
 		select {
 		case payload := <-ci.writeChan:
@@ -80,7 +83,7 @@ func (ci *TcpConnection) writeLoop() {
 					log.Errorf("connection write error: %v", err)
 				}
 			}
-		case <-ci.writeChanStop:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -113,12 +116,9 @@ func (ci *TcpConnection) Send(msg []byte) error {
 }
 
 func (ci *TcpConnection) Close() {
-	_ = ci.conn.Close()
-}
-
-func (ci *TcpConnection) OnClose() {
-	close(ci.writeChanStop)
-	close(ci.readChanStop)
+	if ci.cancel != nil {
+		ci.cancel()
+	}
 }
 
 func (ci *TcpConnection) BindMsgHandler(msgHandler iface2.INetMsgHandler) {

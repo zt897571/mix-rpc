@@ -13,17 +13,19 @@
 -define(REQ_FLAG, 2#1).     %% 是否为请求
 -define(CALL_FLAG, 2#10).   %% 是否为rpc_call
 -define(NODEMSG_FLAG, 2#100).  %% 是否为node消息
-
+-define(VERIFY_FLAG, 2#1000).  %% 是否为验证消息
 %% req
 -define(NODECALLMSG, 2#111).
 -define(NODECASTMSG, 2#101).
 
 -define(ACTORCALLMSG, 2#110).
 -define(ACTORCASTMSG, 2#100).
+-define(VERIFY_REQ_MSG, 2#1001).
 
 %% reply
--define(NODEREPLYMSG, 2#100).
--define(ACTORREPLYMSG, 2#000).
+-define(NODE_REPLY_MSG, 2#100).
+-define(ACTOR_REPLY_MSG, 2#000).
+-define(VERIFY_REPLY_MSG, 2#1000).
 
 -define(UNSIGNINT, unsigned-big-integer).
 
@@ -32,4 +34,3 @@
 
 -define(PID_DIST_TYPE, 88).
 
--define(IF(BOOL, V1, V2), case BOOL of true -> V1; false -> V2 end).

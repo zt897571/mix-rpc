@@ -26,7 +26,7 @@ type IActor interface {
 }
 
 type IPid interface {
-	GetNodeName() NodeName
+	GetNode() string
 	Encode() []byte
 	IsLocal() bool
 	String() string

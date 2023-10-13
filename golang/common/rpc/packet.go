@@ -51,6 +51,10 @@ func (p *packet) isNodeMsg() bool {
 	return CheckFlag(p.flag, NODEMSG_FLAG)
 }
 
+func (p *packet) isVerifyMsg() bool {
+	return CheckFlag(p.flag, VERIFYMSG_FLAG)
+}
+
 func (p *packet) GetSeq() uint32 {
 	return p.seq
 }

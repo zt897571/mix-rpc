@@ -17,9 +17,10 @@ import (
 type FlagType uint16
 
 const (
-	REQ_FLAG     FlagType = 0b1
-	CALL_FLAG             = 0b10
-	NODEMSG_FLAG          = 0b100
+	REQ_FLAG       FlagType = 0b1
+	CALL_FLAG               = 0b10
+	NODEMSG_FLAG            = 0b100
+	VERIFYMSG_FLAG          = 0b1000
 )
 
 func BuildFlag(flagList []FlagType) FlagType {

@@ -51,4 +51,20 @@
         }).
 -endif.
 
+-ifndef('XGAME.REQ_VERIFY_PB_H').
+-define('XGAME.REQ_VERIFY_PB_H', true).
+-record('xgame.req_verify',
+        {node = []              :: unicode:chardata() | undefined, % = 1, optional
+         cookie = []            :: unicode:chardata() | undefined % = 2, optional
+        }).
+-endif.
+
+-ifndef('XGAME.REPLY_VERIFY_PB_H').
+-define('XGAME.REPLY_VERIFY_PB_H', true).
+-record('xgame.reply_verify',
+        {node = []              :: unicode:chardata() | undefined, % = 1, optional
+         error = []             :: unicode:chardata() | undefined % = 2, optional
+        }).
+-endif.
+
 -endif.

@@ -23,6 +23,7 @@ type Server struct {
 	listen     net.Listener
 	connConfig *iface2.ConnectionConfig
 	handler    iface2.INewConnection
+	cancel     context.CancelFunc
 }
 
 var _ iface2.INetServer = (*Server)(nil)
@@ -50,10 +51,13 @@ func (s *Server) Start(handler iface2.INewConnection, startedChannel chan error)
 		KeepAlive: 15 * time.Second,
 	}
 	// todo zhangtuo root context
-	s.listen, err = ls.Listen(context.Background(), "tcp", s.addr)
+	ctx, cancle := context.WithCancel(context.Background())
+	defer cancle()
+	s.listen, err = ls.Listen(ctx, "tcp", s.addr)
 	if err != nil {
 		return
 	}
+	s.cancel = cancle
 	func() {
 		defer s.onClose()
 		atomic.StoreInt32(&s.start, 1)
@@ -74,10 +78,10 @@ func (s *Server) Stop() {
 	if atomic.LoadInt32(&s.start) != 1 {
 		return
 	}
+	s.cancel()
 	s.onClose()
 }
 
 func (s *Server) onClose() {
-	_ = s.listen.Close()
 	atomic.StoreInt32(&s.start, 0)
 }

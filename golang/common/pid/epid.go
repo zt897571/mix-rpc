@@ -27,7 +27,7 @@ const (
 )
 
 type ePid struct {
-	nodeName iface.NodeName
+	nodeName string
 	id       uint32
 	binData  []byte
 }
@@ -38,7 +38,7 @@ func (p *ePid) String() string {
 
 var _ iface.IPid = (*ePid)(nil)
 
-func (p *ePid) GetNodeName() iface.NodeName {
+func (p *ePid) GetNode() string {
 	return p.nodeName
 }
 
@@ -70,7 +70,7 @@ func decodeEPid(bin []byte) (iface.IPid, error) {
 		return nil, error_code.NodeNameFormatError
 	}
 	pid := &ePid{
-		nodeName: iface.NodeName(nodeName),
+		nodeName: nodeName,
 		binData:  bin,
 		id:       id,
 		//Serial:   serial,

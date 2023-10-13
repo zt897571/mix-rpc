@@ -12,20 +12,17 @@ import (
 	"golang/common/iface"
 	"golang/common/log"
 	iface2 "golang/common/xnet/iface"
-	"golang/common/xnet/tcp"
 	xgame "golang/proto"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type RpcProxy struct {
 	seq        uint32
 	conn       iface2.IConnection
 	reqWaitMap sync.Map
-	remoteHost string
-	localHost  string
+	verified   bool
+	nodename   string
 }
 
 var _ iface.IRpcProxy = (*RpcProxy)(nil)
@@ -39,6 +36,17 @@ func (r *RpcProxy) OnReceiveMsg(payload []byte) {
 	if err != nil {
 		log.Errorf("parse packet error = %v", err)
 		return
+	}
+	if pkg.isVerifyMsg() {
+		if r.verified {
+			log.Warnf("already verified")
+			return
+		}
+		err = r.handleVerifyMsg(pkg)
+		if err != nil {
+			r.Close()
+			return
+		}
 	}
 	if pkg.isReq() {
 		// 请求消息处理
@@ -118,7 +126,34 @@ func (r *RpcProxy) handleProcessReqMsg(pkt *packet) {
 		log.Errorf("handle actor msg error = %v", err)
 		return
 	}
+}
 
+func (r *RpcProxy) handleVerifyMsg(pkt *packet) error {
+	if CheckFlag(pkt.flag, REQ_FLAG) {
+		reqMsg := &xgame.ReqVerify{}
+		err := proto.Unmarshal(pkt.payload, reqMsg)
+		if err != nil {
+			return err
+		}
+		if reqMsg.Cookie == GetCookie() {
+			r.verified = true
+			err := r.sendMsg(pkt.seq, 0, &xgame.ReplyVerify{Node: GetNodeName()})
+			if err != nil {
+				return err
+			}
+			return nil
+		} else {
+			return error_code.VerifyError
+		}
+	} else {
+		replyMsg := &xgame.ReplyVerify{}
+		err := proto.Unmarshal(pkt.payload, replyMsg)
+		if err != nil && replyMsg.Error != "" {
+			return err
+		}
+		r.verified = true
+		return nil
+	}
 }
 
 func (r *RpcProxy) NextSeq() uint32 {
@@ -140,19 +175,8 @@ func (r *RpcProxy) getRegChan(seq uint32) chan iface.IRpcReplyMsg {
 	return nil
 }
 
-func (r *RpcProxy) GetRemoteHost() string {
-	if r.remoteHost == "" {
-		remoteAddr := r.conn.GetRemoteAddress()
-		r.remoteHost = strings.Split(remoteAddr, ":")[0]
-	}
-	return r.remoteHost
-}
-
-func (r *RpcProxy) GetLocalHost() string {
-	if r.localHost == "" {
-		r.localHost = r.conn.GetLocalAddress()
-	}
-	return r.localHost
+func (r *RpcProxy) GetNodeName() string {
+	return r.nodename
 }
 
 func (r *RpcProxy) ReplyReq(seq uint32, replyMsg iface.IRpcReplyMsg) error {
@@ -174,6 +198,9 @@ func (r *RpcProxy) GetConnection() iface2.IConnection {
 }
 
 func (r *RpcProxy) sendMsg(seq uint32, flag FlagType, msg proto.Message) error {
+	if r.conn == nil {
+		return error_code.RpcNodeNotConnected
+	}
 	msgBin, err := buildMsg(flag, seq, msg)
 	if err != nil {
 		return err
@@ -197,6 +224,13 @@ func (r *RpcProxy) SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg
 	return r.sendMsg(seq, flag, &xgame.ReqMessage{ProcessMsg: msg})
 }
 
+func (r *RpcProxy) Close() {
+	if r.conn != nil {
+		r.conn.Close()
+		r.conn = nil
+	}
+}
+
 var processDispatcher iface.IProcessMsgDispatcher
 var nodeCallFlag = BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG, CALL_FLAG})
 var nodeCastFlag = BuildFlag([]FlagType{NODEMSG_FLAG, REQ_FLAG})
@@ -206,43 +240,6 @@ var processCastFlag = BuildFlag([]FlagType{REQ_FLAG})
 
 func RegisterProcessDispatcher(dispatcher iface.IProcessMsgDispatcher) {
 	processDispatcher = dispatcher
-}
-
-func Connect(IpAddress string) (iface.IRpcProxy, error) {
-	connection, err := tcp.Connect(IpAddress, nil)
-	if err != nil {
-		return nil, err
-	}
-	rpcProxy := NewRpcProxy()
-	connection.BindMsgHandler(rpcProxy)
-	go func() {
-		mgr := GetRpcProxyMgr()
-		mgr.RegisterProxy(rpcProxy)
-		defer mgr.RemoveProxy(rpcProxy)
-		connection.Run()
-	}()
-	return rpcProxy, nil
-}
-
-func NodeCast(proxy iface.IRpcProxy, mfa *xgame.PbMfa) error {
-	return proxy.SendNodeMsg(0, false, mfa)
-}
-
-func NodeCall(proxy iface.IRpcProxy, mfa *xgame.PbMfa, timeout time.Duration) (proto.Message, error) {
-	seq := proxy.NextSeq()
-	replyChan := make(chan iface.IRpcReplyMsg, 1)
-	proxy.RegSeq(seq, replyChan)
-	defer proxy.UnRegSeq(seq)
-	err := proxy.SendNodeMsg(seq, true, mfa)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case replyMsg := <-replyChan:
-		return replyMsg.GetRpcResult()
-	case <-time.After(timeout):
-		return nil, error_code.TimeOutError
-	}
 }
 
 func BuildMfa(module string, function string, args proto.Message) (*xgame.PbMfa, error) {

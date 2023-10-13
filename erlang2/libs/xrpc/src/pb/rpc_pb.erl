@@ -64,9 +64,13 @@
 
 -type 'xgame.reply_message'() :: #'xgame.reply_message'{}.
 
--export_type(['xgame.process_msg'/0, 'xgame.pb_mfa'/0, 'xgame.rpc_params'/0, 'xgame.req_message'/0, 'xgame.reply_message'/0]).
--type '$msg_name'() :: 'xgame.process_msg' | 'xgame.pb_mfa' | 'xgame.rpc_params' | 'xgame.req_message' | 'xgame.reply_message'.
--type '$msg'() :: 'xgame.process_msg'() | 'xgame.pb_mfa'() | 'xgame.rpc_params'() | 'xgame.req_message'() | 'xgame.reply_message'().
+-type 'xgame.req_verify'() :: #'xgame.req_verify'{}.
+
+-type 'xgame.reply_verify'() :: #'xgame.reply_verify'{}.
+
+-export_type(['xgame.process_msg'/0, 'xgame.pb_mfa'/0, 'xgame.rpc_params'/0, 'xgame.req_message'/0, 'xgame.reply_message'/0, 'xgame.req_verify'/0, 'xgame.reply_verify'/0]).
+-type '$msg_name'() :: 'xgame.process_msg' | 'xgame.pb_mfa' | 'xgame.rpc_params' | 'xgame.req_message' | 'xgame.reply_message' | 'xgame.req_verify' | 'xgame.reply_verify'.
+-type '$msg'() :: 'xgame.process_msg'() | 'xgame.pb_mfa'() | 'xgame.rpc_params'() | 'xgame.req_message'() | 'xgame.reply_message'() | 'xgame.req_verify'() | 'xgame.reply_verify'().
 -export_type(['$msg_name'/0, '$msg'/0]).
 
 -spec encode_msg('$msg'()) -> binary().
@@ -88,7 +92,9 @@ encode_msg(Msg, MsgName, Opts) ->
         'xgame.pb_mfa' -> 'encode_msg_xgame.pb_mfa'(id(Msg, TrUserData), TrUserData);
         'xgame.rpc_params' -> 'encode_msg_xgame.rpc_params'(id(Msg, TrUserData), TrUserData);
         'xgame.req_message' -> 'encode_msg_xgame.req_message'(id(Msg, TrUserData), TrUserData);
-        'xgame.reply_message' -> 'encode_msg_xgame.reply_message'(id(Msg, TrUserData), TrUserData)
+        'xgame.reply_message' -> 'encode_msg_xgame.reply_message'(id(Msg, TrUserData), TrUserData);
+        'xgame.req_verify' -> 'encode_msg_xgame.req_verify'(id(Msg, TrUserData), TrUserData);
+        'xgame.reply_verify' -> 'encode_msg_xgame.reply_verify'(id(Msg, TrUserData), TrUserData)
     end.
 
 
@@ -239,6 +245,56 @@ encode_msg(Msg, MsgName, Opts) ->
                case is_empty_string(TrF3) of
                    true -> B2;
                    false -> e_type_string(TrF3, <<B2/binary, 26>>, TrUserData)
+               end
+           end
+    end.
+
+'encode_msg_xgame.req_verify'(Msg, TrUserData) -> 'encode_msg_xgame.req_verify'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_xgame.req_verify'(#'xgame.req_verify'{node = F1, cookie = F2}, Bin, TrUserData) ->
+    B1 = if F1 == undefined -> Bin;
+            true ->
+                begin
+                    TrF1 = id(F1, TrUserData),
+                    case is_empty_string(TrF1) of
+                        true -> Bin;
+                        false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                    end
+                end
+         end,
+    if F2 == undefined -> B1;
+       true ->
+           begin
+               TrF2 = id(F2, TrUserData),
+               case is_empty_string(TrF2) of
+                   true -> B1;
+                   false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+               end
+           end
+    end.
+
+'encode_msg_xgame.reply_verify'(Msg, TrUserData) -> 'encode_msg_xgame.reply_verify'(Msg, <<>>, TrUserData).
+
+
+'encode_msg_xgame.reply_verify'(#'xgame.reply_verify'{node = F1, error = F2}, Bin, TrUserData) ->
+    B1 = if F1 == undefined -> Bin;
+            true ->
+                begin
+                    TrF1 = id(F1, TrUserData),
+                    case is_empty_string(TrF1) of
+                        true -> Bin;
+                        false -> e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+                    end
+                end
+         end,
+    if F2 == undefined -> B1;
+       true ->
+           begin
+               TrF2 = id(F2, TrUserData),
+               case is_empty_string(TrF2) of
+                   true -> B1;
+                   false -> e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
                end
            end
     end.
@@ -405,7 +461,9 @@ decode_msg_2_doit('xgame.process_msg', Bin, TrUserData) -> id('decode_msg_xgame.
 decode_msg_2_doit('xgame.pb_mfa', Bin, TrUserData) -> id('decode_msg_xgame.pb_mfa'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('xgame.rpc_params', Bin, TrUserData) -> id('decode_msg_xgame.rpc_params'(Bin, TrUserData), TrUserData);
 decode_msg_2_doit('xgame.req_message', Bin, TrUserData) -> id('decode_msg_xgame.req_message'(Bin, TrUserData), TrUserData);
-decode_msg_2_doit('xgame.reply_message', Bin, TrUserData) -> id('decode_msg_xgame.reply_message'(Bin, TrUserData), TrUserData).
+decode_msg_2_doit('xgame.reply_message', Bin, TrUserData) -> id('decode_msg_xgame.reply_message'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('xgame.req_verify', Bin, TrUserData) -> id('decode_msg_xgame.req_verify'(Bin, TrUserData), TrUserData);
+decode_msg_2_doit('xgame.reply_verify', Bin, TrUserData) -> id('decode_msg_xgame.reply_verify'(Bin, TrUserData), TrUserData).
 
 
 
@@ -719,6 +777,108 @@ decode_msg_2_doit('xgame.reply_message', Bin, TrUserData) -> id('decode_msg_xgam
 
 'skip_64_xgame.reply_message'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData) -> 'dfp_read_field_def_xgame.reply_message'(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, TrUserData).
 
+'decode_msg_xgame.req_verify'(Bin, TrUserData) -> 'dfp_read_field_def_xgame.req_verify'(Bin, 0, 0, 0, id([], TrUserData), id([], TrUserData), TrUserData).
+
+'dfp_read_field_def_xgame.req_verify'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_xgame.req_verify_node'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_xgame.req_verify'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_xgame.req_verify_cookie'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_xgame.req_verify'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #'xgame.req_verify'{node = F@_1, cookie = F@_2};
+'dfp_read_field_def_xgame.req_verify'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_xgame.req_verify'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_xgame.req_verify'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_xgame.req_verify'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_xgame.req_verify'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_xgame.req_verify_node'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_xgame.req_verify_cookie'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_xgame.req_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_xgame.req_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_xgame.req_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_xgame.req_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_xgame.req_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_xgame.req_verify'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #'xgame.req_verify'{node = F@_1, cookie = F@_2}.
+
+'d_field_xgame.req_verify_node'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_xgame.req_verify_node'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_xgame.req_verify_node'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    'dfp_read_field_def_xgame.req_verify'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_xgame.req_verify_cookie'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_xgame.req_verify_cookie'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_xgame.req_verify_cookie'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    'dfp_read_field_def_xgame.req_verify'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+
+'skip_varint_xgame.req_verify'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_xgame.req_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_xgame.req_verify'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.req_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_xgame.req_verify'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_xgame.req_verify'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_xgame.req_verify'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_xgame.req_verify'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_xgame.req_verify'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_xgame.req_verify'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_xgame.req_verify'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.req_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_xgame.req_verify'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.req_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'decode_msg_xgame.reply_verify'(Bin, TrUserData) -> 'dfp_read_field_def_xgame.reply_verify'(Bin, 0, 0, 0, id([], TrUserData), id([], TrUserData), TrUserData).
+
+'dfp_read_field_def_xgame.reply_verify'(<<10, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_xgame.reply_verify_node'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_xgame.reply_verify'(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'd_field_xgame.reply_verify_error'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'dfp_read_field_def_xgame.reply_verify'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #'xgame.reply_verify'{node = F@_1, error = F@_2};
+'dfp_read_field_def_xgame.reply_verify'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dg_read_field_def_xgame.reply_verify'(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'dg_read_field_def_xgame.reply_verify'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> 'dg_read_field_def_xgame.reply_verify'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'dg_read_field_def_xgame.reply_verify'(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+        10 -> 'd_field_xgame.reply_verify_node'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        18 -> 'd_field_xgame.reply_verify_error'(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        _ ->
+            case Key band 7 of
+                0 -> 'skip_varint_xgame.reply_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                1 -> 'skip_64_xgame.reply_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                2 -> 'skip_length_delimited_xgame.reply_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                3 -> 'skip_group_xgame.reply_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
+                5 -> 'skip_32_xgame.reply_verify'(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+            end
+    end;
+'dg_read_field_def_xgame.reply_verify'(<<>>, 0, 0, _, F@_1, F@_2, _) -> #'xgame.reply_verify'{node = F@_1, error = F@_2}.
+
+'d_field_xgame.reply_verify_node'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_xgame.reply_verify_node'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_xgame.reply_verify_node'(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    'dfp_read_field_def_xgame.reply_verify'(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+
+'d_field_xgame.reply_verify_error'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'd_field_xgame.reply_verify_error'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'d_field_xgame.reply_verify_error'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Utf8:Len/binary, Rest2/binary>> = Rest, {id(unicode:characters_to_list(Utf8, unicode), TrUserData), Rest2} end,
+    'dfp_read_field_def_xgame.reply_verify'(RestF, 0, 0, F, F@_1, NewFValue, TrUserData).
+
+'skip_varint_xgame.reply_verify'(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'skip_varint_xgame.reply_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
+'skip_varint_xgame.reply_verify'(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.reply_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_length_delimited_xgame.reply_verify'(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> 'skip_length_delimited_xgame.reply_verify'(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
+'skip_length_delimited_xgame.reply_verify'(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    'dfp_read_field_def_xgame.reply_verify'(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+
+'skip_group_xgame.reply_verify'(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    'dfp_read_field_def_xgame.reply_verify'(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+
+'skip_32_xgame.reply_verify'(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.reply_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
+'skip_64_xgame.reply_verify'(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 'dfp_read_field_def_xgame.reply_verify'(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+
 read_group(Bin, FieldNum) ->
     {NumBytes, EndTagLen} = read_gr_b(Bin, 0, 0, 0, 0, FieldNum),
     <<Group:NumBytes/binary, _:EndTagLen/binary, Rest/binary>> = Bin,
@@ -789,7 +949,9 @@ merge_msgs(Prev, New, MsgName, Opts) ->
         'xgame.pb_mfa' -> 'merge_msg_xgame.pb_mfa'(Prev, New, TrUserData);
         'xgame.rpc_params' -> 'merge_msg_xgame.rpc_params'(Prev, New, TrUserData);
         'xgame.req_message' -> 'merge_msg_xgame.req_message'(Prev, New, TrUserData);
-        'xgame.reply_message' -> 'merge_msg_xgame.reply_message'(Prev, New, TrUserData)
+        'xgame.reply_message' -> 'merge_msg_xgame.reply_message'(Prev, New, TrUserData);
+        'xgame.req_verify' -> 'merge_msg_xgame.req_verify'(Prev, New, TrUserData);
+        'xgame.reply_verify' -> 'merge_msg_xgame.reply_verify'(Prev, New, TrUserData)
     end.
 
 -compile({nowarn_unused_function,'merge_msg_xgame.process_msg'/3}).
@@ -863,6 +1025,28 @@ merge_msgs(Prev, New, MsgName, Opts) ->
                                   true -> NFerror
                                end}.
 
+-compile({nowarn_unused_function,'merge_msg_xgame.req_verify'/3}).
+'merge_msg_xgame.req_verify'(#'xgame.req_verify'{node = PFnode, cookie = PFcookie}, #'xgame.req_verify'{node = NFnode, cookie = NFcookie}, _) ->
+    #'xgame.req_verify'{node =
+                            if NFnode =:= undefined -> PFnode;
+                               true -> NFnode
+                            end,
+                        cookie =
+                            if NFcookie =:= undefined -> PFcookie;
+                               true -> NFcookie
+                            end}.
+
+-compile({nowarn_unused_function,'merge_msg_xgame.reply_verify'/3}).
+'merge_msg_xgame.reply_verify'(#'xgame.reply_verify'{node = PFnode, error = PFerror}, #'xgame.reply_verify'{node = NFnode, error = NFerror}, _) ->
+    #'xgame.reply_verify'{node =
+                              if NFnode =:= undefined -> PFnode;
+                                 true -> NFnode
+                              end,
+                          error =
+                              if NFerror =:= undefined -> PFerror;
+                                 true -> NFerror
+                              end}.
+
 
 verify_msg(Msg) when tuple_size(Msg) >= 1 -> verify_msg(Msg, element(1, Msg), []);
 verify_msg(X) -> mk_type_error(not_a_known_message, X, []).
@@ -879,6 +1063,8 @@ verify_msg(Msg, MsgName, Opts) ->
         'xgame.rpc_params' -> 'v_msg_xgame.rpc_params'(Msg, [MsgName], TrUserData);
         'xgame.req_message' -> 'v_msg_xgame.req_message'(Msg, [MsgName], TrUserData);
         'xgame.reply_message' -> 'v_msg_xgame.reply_message'(Msg, [MsgName], TrUserData);
+        'xgame.req_verify' -> 'v_msg_xgame.req_verify'(Msg, [MsgName], TrUserData);
+        'xgame.reply_verify' -> 'v_msg_xgame.reply_verify'(Msg, [MsgName], TrUserData);
         _ -> mk_type_error(not_a_known_message, Msg, [])
     end.
 
@@ -964,6 +1150,30 @@ verify_msg(Msg, MsgName, Opts) ->
     ok;
 'v_msg_xgame.reply_message'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'xgame.reply_message'}, X, Path).
 
+-compile({nowarn_unused_function,'v_msg_xgame.req_verify'/3}).
+-dialyzer({nowarn_function,'v_msg_xgame.req_verify'/3}).
+'v_msg_xgame.req_verify'(#'xgame.req_verify'{node = F1, cookie = F2}, Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_type_string(F1, [node | Path], TrUserData)
+    end,
+    if F2 == undefined -> ok;
+       true -> v_type_string(F2, [cookie | Path], TrUserData)
+    end,
+    ok;
+'v_msg_xgame.req_verify'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'xgame.req_verify'}, X, Path).
+
+-compile({nowarn_unused_function,'v_msg_xgame.reply_verify'/3}).
+-dialyzer({nowarn_function,'v_msg_xgame.reply_verify'/3}).
+'v_msg_xgame.reply_verify'(#'xgame.reply_verify'{node = F1, error = F2}, Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_type_string(F1, [node | Path], TrUserData)
+    end,
+    if F2 == undefined -> ok;
+       true -> v_type_string(F2, [error | Path], TrUserData)
+    end,
+    ok;
+'v_msg_xgame.reply_verify'(X, Path, _TrUserData) -> mk_type_error({expected_msg, 'xgame.reply_verify'}, X, Path).
+
 -compile({nowarn_unused_function,v_type_string/3}).
 -dialyzer({nowarn_function,v_type_string/3}).
 v_type_string(S, Path, _TrUserData) when is_list(S); is_binary(S) ->
@@ -1033,16 +1243,18 @@ get_msg_defs() ->
      {{msg, 'xgame.reply_message'},
       [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
        #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
-       #field{name = error, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []}]}].
+       #field{name = error, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []}]},
+     {{msg, 'xgame.req_verify'}, [#field{name = node, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = cookie, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []}]},
+     {{msg, 'xgame.reply_verify'}, [#field{name = node, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = error, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []}]}].
 
 
-get_msg_names() -> ['xgame.process_msg', 'xgame.pb_mfa', 'xgame.rpc_params', 'xgame.req_message', 'xgame.reply_message'].
+get_msg_names() -> ['xgame.process_msg', 'xgame.pb_mfa', 'xgame.rpc_params', 'xgame.req_message', 'xgame.reply_message', 'xgame.req_verify', 'xgame.reply_verify'].
 
 
 get_group_names() -> [].
 
 
-get_msg_or_group_names() -> ['xgame.process_msg', 'xgame.pb_mfa', 'xgame.rpc_params', 'xgame.req_message', 'xgame.reply_message'].
+get_msg_or_group_names() -> ['xgame.process_msg', 'xgame.pb_mfa', 'xgame.rpc_params', 'xgame.req_message', 'xgame.reply_message', 'xgame.req_verify', 'xgame.reply_verify'].
 
 
 get_enum_names() -> [].
@@ -1074,6 +1286,8 @@ find_msg_def('xgame.reply_message') ->
     [#field{name = msgName, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []},
      #field{name = payload, fnum = 2, rnum = 3, type = bytes, occurrence = optional, opts = []},
      #field{name = error, fnum = 3, rnum = 4, type = string, occurrence = optional, opts = []}];
+find_msg_def('xgame.req_verify') -> [#field{name = node, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = cookie, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []}];
+find_msg_def('xgame.reply_verify') -> [#field{name = node, fnum = 1, rnum = 2, type = string, occurrence = optional, opts = []}, #field{name = error, fnum = 2, rnum = 3, type = string, occurrence = optional, opts = []}];
 find_msg_def(_) -> error.
 
 
@@ -1137,6 +1351,8 @@ fqbin_to_msg_name(<<"xgame.pb_mfa">>) -> 'xgame.pb_mfa';
 fqbin_to_msg_name(<<"xgame.rpc_params">>) -> 'xgame.rpc_params';
 fqbin_to_msg_name(<<"xgame.req_message">>) -> 'xgame.req_message';
 fqbin_to_msg_name(<<"xgame.reply_message">>) -> 'xgame.reply_message';
+fqbin_to_msg_name(<<"xgame.req_verify">>) -> 'xgame.req_verify';
+fqbin_to_msg_name(<<"xgame.reply_verify">>) -> 'xgame.reply_verify';
 fqbin_to_msg_name(E) -> error({gpb_error, {badmsg, E}}).
 
 
@@ -1145,6 +1361,8 @@ msg_name_to_fqbin('xgame.pb_mfa') -> <<"xgame.pb_mfa">>;
 msg_name_to_fqbin('xgame.rpc_params') -> <<"xgame.rpc_params">>;
 msg_name_to_fqbin('xgame.req_message') -> <<"xgame.req_message">>;
 msg_name_to_fqbin('xgame.reply_message') -> <<"xgame.reply_message">>;
+msg_name_to_fqbin('xgame.req_verify') -> <<"xgame.req_verify">>;
+msg_name_to_fqbin('xgame.reply_verify') -> <<"xgame.reply_verify">>;
 msg_name_to_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 
@@ -1183,7 +1401,7 @@ get_all_source_basenames() -> ["rpc.proto"].
 get_all_proto_names() -> ["rpc"].
 
 
-get_msg_containment("rpc") -> ['xgame.pb_mfa', 'xgame.process_msg', 'xgame.reply_message', 'xgame.req_message', 'xgame.rpc_params'];
+get_msg_containment("rpc") -> ['xgame.pb_mfa', 'xgame.process_msg', 'xgame.reply_message', 'xgame.reply_verify', 'xgame.req_message', 'xgame.req_verify', 'xgame.rpc_params'];
 get_msg_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
@@ -1208,6 +1426,8 @@ get_proto_by_msg_name_as_fqbin(<<"xgame.rpc_params">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(<<"xgame.req_message">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(<<"xgame.reply_message">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(<<"xgame.process_msg">>) -> "rpc";
+get_proto_by_msg_name_as_fqbin(<<"xgame.req_verify">>) -> "rpc";
+get_proto_by_msg_name_as_fqbin(<<"xgame.reply_verify">>) -> "rpc";
 get_proto_by_msg_name_as_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 

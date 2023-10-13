@@ -18,7 +18,7 @@ import (
 )
 
 type gPid struct {
-	nodeName iface.NodeName
+	nodeName string
 	id       uint32
 }
 
@@ -28,12 +28,12 @@ func (g *gPid) String() string {
 	return fmt.Sprintf("%s:%d", g.nodeName, g.id)
 }
 
-func (g *gPid) GetNodeName() iface.NodeName {
+func (g *gPid) GetNode() string {
 	return g.nodeName
 }
 
 func (g *gPid) IsLocal() bool {
-	return g.nodeName == iface.GetNodeName()
+	return g.nodeName == iface.GetNode().GetNodeName()
 }
 
 func (g *gPid) Encode() []byte {
@@ -52,7 +52,6 @@ func (g *gPid) Encode() []byte {
 var baseIndex uint32
 
 func nextId() uint32 {
-	// todo:: zhangtuo 处理达到最大值后重复的情况
 	return atomic.AddUint32(&baseIndex, 1)
 }
 
@@ -71,14 +70,14 @@ func decodeGPid(bytes []byte) (iface.IPid, error) {
 		return nil, error_code.NodeNameFormatError
 	}
 	return &gPid{
-		nodeName: iface.NodeName(host),
+		nodeName: host,
 		id:       id,
 	}, nil
 }
 
 func NewPid() iface.IPid {
 	return &gPid{
-		nodeName: iface.GetNodeName(),
+		nodeName: iface.GetNode(),
 		id:       nextId(),
 	}
 }

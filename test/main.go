@@ -34,7 +34,8 @@ func main() {
 	flag.Parse()
 	addrSp := strings.Split(*gHost, ":")
 	// todo: zhangtuo 重构整合到 node
-	err := iface2.SetNodeName(fmt.Sprintf("%s@%s", *nodeName, addrSp[0]))
+	nodeName2 := strings.Join([]string{*nodeName, addrSp[0], addrSp[1]}, "@")
+	err := iface2.SetNodeName(nodeName2)
 	if err != nil {
 		log.Errorf("set node name error = %s", err)
 		return
@@ -91,7 +92,7 @@ func connect(args []string) error {
 
 func nodecall(args []string) error {
 	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
+		return error_code.RpcNodeNotConnected
 	}
 	if len(args) < 1 {
 		return error_code.ArgumentError
@@ -111,7 +112,7 @@ func nodecall(args []string) error {
 
 func nodecast(args []string) error {
 	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
+		return error_code.RpcNodeNotConnected
 	}
 	if len(args) < 1 {
 		return error_code.ArgumentError
@@ -125,7 +126,7 @@ func nodecast(args []string) error {
 
 func getRemotePidList(_ []string) error {
 	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
+		return error_code.RpcNodeNotConnected
 	}
 	mfa, err := rpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
 	if err != nil {

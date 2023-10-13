@@ -18,10 +18,9 @@ type IRpcProxy interface {
 	NextSeq() uint32
 	RegSeq(seq uint32, result chan IRpcReplyMsg)
 	UnRegSeq(seq uint32)
-	GetRemoteHost() string
-	GetLocalHost() string
 	SendNodeMsg(seq uint32, isCall bool, msg *xgame.PbMfa) error
 	SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error
+	GetNodeName() string
 }
 
 type IRpcReplyMsg interface {
@@ -30,4 +29,9 @@ type IRpcReplyMsg interface {
 
 type IRpcReplyer interface {
 	ReplyReq(seq uint32, message IRpcReplyMsg) error
+}
+
+type INode interface {
+	GetNodeName() string
+	GetCookie() string
 }

@@ -7,12 +7,15 @@
 package rpc
 
 import (
+	"context"
+	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/smartystreets/goconvey/convey"
 	iface2 "golang/common/iface"
 	"golang/common/utils"
 	xgame "golang/proto"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -174,4 +177,26 @@ func TestNodeSeqCast(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestContext(t *testing.T) {
+	root := context.TODO()
+	ctx, cancelFunc := context.WithCancel(root)
+	var s int32 = 0
+	for i := 0; i < 100; i++ {
+		go func() {
+			select {
+			case <-ctx.Done():
+				atomic.AddInt32(&s, 1)
+				return
+			case <-time.After(time.Second * 5):
+				return
+			}
+		}()
+	}
+	<-time.After(time.Second * 5)
+	cancelFunc()
+	cancelFunc()
+	cancelFunc()
+	fmt.Println(s)
 }
