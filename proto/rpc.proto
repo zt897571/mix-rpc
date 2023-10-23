@@ -31,3 +31,13 @@ message reply_message {
   bytes payload = 2;
   string error = 3;
 }
+
+message req_verify {
+  string node = 1;  // 节点名称
+  string cookie = 2;  // 验证cookie
+}
+
+message reply_verify {
+  string node = 1;
+  string error = 2;
+}

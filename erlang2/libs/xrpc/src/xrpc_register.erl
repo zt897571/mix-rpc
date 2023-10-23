@@ -13,7 +13,8 @@
 -behavior(gen_server).
 
 %% API
--export([start_link/0, init/1, next_seq/1, unregister_node/1, register_node/2, handle_call/3, get_conn_by_node/1, handle_info/2, handle_cast/2]).
+-export([next_seq/1, unregister_node/1, register_node/2]).
+-export([start_link/0, init/1, handle_call/3, get_conn_pid_by_node/1, handle_info/2, handle_cast/2, terminate/2]).
 -record(node_info, {
   node :: atom(),
   seq :: integer(),
@@ -25,16 +26,16 @@
 }).
 
 start_link() ->
-  gen_server:start_link(?MODULE, [], []).
+  gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-  process_flag(trap_exit, true),
+%%  process_flag(trap_exit, true),
   {ok, #state{nodeMap = #{}}}.
 
 next_seq(Node) ->
   gen_server:call(?MODULE, {get_next_seq, Node}).
 
-get_conn_by_node(Node) ->
+get_conn_pid_by_node(Node) ->
   gen_server:call(?MODULE, {get_conn_pid, Node}).
 
 register_node(Node, Pid) ->
@@ -86,6 +87,9 @@ handle_info({'EXIT', Pid, _Reason}, State = #state{nodeMap = NodeMap}) ->
   [Node] = [Node || {Node, #node_info{pid = Pid1}} <- NodeTpList, Pid =:= Pid1],
   {ok, State = #state{nodeMap = maps:remove(Node, NodeMap)}}.
 
+terminate(Reason, State) ->
+  io:format("xrpc_register terminate reason = ~p, state = ~p", [Reason, State]),
+  ok.
 
 handle_cast(_, _) ->
   erlang:error(not_implemented).

@@ -10,13 +10,16 @@
 -author("zhangtuo").
 
 %% API
--export([start_link/0, init/1, start_child/3]).
+-export([start_link/0, init/1, start_child/3, start_child/1]).
 
 start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 start_child(Ref, Transport, Opts) ->
   supervisor:start_child(?MODULE, [Ref, Transport, Opts]).
+
+start_child(Node) ->
+  supervisor:start_child(?MODULE, [Node]).
 
 init([]) ->
   {ok, {{simple_one_for_one, 10, 60},

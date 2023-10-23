@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"golang/common/error_code"
-	iface2 "golang/common/iface"
 	"golang/common/log"
-	"golang/common/pid"
-	"golang/common/process"
-	"golang/common/rpc"
+	"golang/error_code"
+	iface2 "golang/iface"
 	xgame "golang/proto"
+	"golang/xrpc"
 	"os"
 	"strings"
 	"time"
@@ -23,7 +21,6 @@ var gCmd2Func = map[string]func(args []string) error{
 	"connect":          connect,
 	"nodecall":         nodecall,
 	"nodecast":         nodecast,
-	"listProxy":        listProxy,
 	"getRemotePidList": getRemotePidList,
 	"actorCall":        actorCall,
 	"actorCast":        actorCast,
@@ -33,19 +30,13 @@ var gCmd2Func = map[string]func(args []string) error{
 func main() {
 	flag.Parse()
 	addrSp := strings.Split(*gHost, ":")
-	// todo: zhangtuo 重构整合到 node
-	err := iface2.SetNodeName(fmt.Sprintf("%s@%s", *nodeName, addrSp[0]))
+	nodeName2 := strings.Join([]string{*nodeName, addrSp[0], addrSp[1]}, ":")
+	err := xrpc.Start(nodeName2, "testcookie")
 	if err != nil {
-		log.Errorf("set node name error = %s", err)
 		return
 	}
-	server := rpc.NewRpcServer(*gHost)
-	err = server.Start()
-	if err != nil {
-		log.Errorf("start server error = %s", err)
-		return
-	}
-	rpc.RegisterNodeMsg("test", &NodeCmd{})
+
+	xrpc.RegisterNodeMsg("test", &NodeCmd{})
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -71,18 +62,9 @@ func main() {
 
 var remotePidList []iface2.IPid
 
-func getRpcProxy() iface2.IRpcProxy {
-	allProxy := rpc.GetRpcProxyMgr().GetAllProxy()
-	if len(allProxy) > 0 {
-		return allProxy[0]
-	} else {
-		return nil
-	}
-}
-
 func connect(args []string) error {
-	targetHost := args[0]
-	_, err := rpc.Connect(targetHost)
+	targetNode := args[0]
+	err := xrpc.Connect(targetNode)
 	if err != nil {
 		return err
 	}
@@ -90,18 +72,14 @@ func connect(args []string) error {
 }
 
 func nodecall(args []string) error {
-	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
-	}
-	if len(args) < 1 {
+	if len(args) < 2 {
 		return error_code.ArgumentError
 	}
-	//mfa, err := rpc.BuildMfa("test", "TestNodeCall", &xgame.TestMsg{Msg: args[0]})
-	mfa, err := rpc.BuildMfa("test", "test_node_call", &xgame.TestMsg{Msg: args[0]})
+	mfa, err := xrpc.BuildMfa("test", "test_node_call", &xgame.TestMsg{Msg: args[1]})
 	if err != nil {
 		return err
 	}
-	rst, err := rpc.NodeCall(getRpcProxy(), mfa, time.Second)
+	rst, err := xrpc.NodeCall(args[0], mfa, time.Second)
 	if err != nil {
 		return err
 	}
@@ -110,34 +88,28 @@ func nodecall(args []string) error {
 }
 
 func nodecast(args []string) error {
-	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
-	}
 	if len(args) < 1 {
 		return error_code.ArgumentError
 	}
-	mfa, err := rpc.BuildMfa("test", "TestNodeCast", &xgame.TestMsg{Msg: args[0]})
+	mfa, err := xrpc.BuildMfa("test", "TestNodeCast", &xgame.TestMsg{Msg: args[1]})
 	if err != nil {
 		return err
 	}
-	return rpc.NodeCast(getRpcProxy(), mfa)
+	return xrpc.NodeCast(args[0], mfa)
 }
 
-func getRemotePidList(_ []string) error {
-	if getRpcProxy() == nil {
-		return error_code.RpcHostNotConnected
-	}
-	mfa, err := rpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
+func getRemotePidList(args []string) error {
+	mfa, err := xrpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
 	if err != nil {
 		return err
 	}
-	reply, err := rpc.NodeCall(getRpcProxy(), mfa, time.Second)
+	reply, err := xrpc.NodeCall(args[0], mfa, time.Second)
 	if err != nil {
 		return err
 	}
 	replyMsg := reply.(*xgame.ReplyGetPidList)
 	for _, pidBin := range replyMsg.Pids {
-		decodePid, err := pid.DecodePid(pidBin)
+		decodePid, err := xrpc.DecodePid(pidBin)
 		if err != nil {
 			return err
 		}
@@ -151,7 +123,7 @@ func actorCall(args []string) error {
 	if len(remotePidList) < 1 || len(args) < 1 {
 		return error_code.ArgumentError
 	}
-	reply, err := process.Call(remotePidList[0], &xgame.TestMsg{Msg: args[0]}, time.Second*3)
+	reply, err := xrpc.Call(remotePidList[0], &xgame.TestMsg{Msg: args[0]}, time.Second*3)
 	if err != nil {
 		return err
 	}
@@ -163,16 +135,7 @@ func actorCast(args []string) error {
 	if len(remotePidList) < 1 || len(args) < 1 {
 		return error_code.ArgumentError
 	}
-	return process.Cast(remotePidList[0], &xgame.TestMsg{Msg: args[0]})
-}
-
-func listProxy(_ []string) error {
-	proxyMgr := rpc.GetRpcProxyMgr()
-	proxyList := proxyMgr.GetAllProxy()
-	for _, proxy := range proxyList {
-		fmt.Printf("RpcProxy: local = %s, remote = %s\n", proxy.GetLocalHost(), proxy.GetRemoteHost())
-	}
-	return nil
+	return xrpc.Cast(remotePidList[0], &xgame.TestMsg{Msg: args[0]})
 }
 
 func safeExec(f func([]string) error, args []string) error {

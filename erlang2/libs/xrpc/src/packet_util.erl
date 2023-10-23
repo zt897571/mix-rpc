@@ -10,11 +10,12 @@
 -author("zhangtuo").
 
 -include("rpc_pb.hrl").
+-include("xrpc.hrl").
 -include("error_code.hrl").
 
 %% API
 -export([check_flag/2, build_flag/1, encode_reply_msg/1, decode_reply_msg/1]).
--export([encode_mfa/3, decode_mfa/1, encode_process_req/3, decode_process_req/1]).
+-export([encode_mfa/3, decode_mfa/1, encode_process_req/3, decode_process_req/1, decode_packet/1, encode_packet/3]).
 
 build_flag(FlagList) when is_list(FlagList) ->
   lists:foldl(
@@ -22,8 +23,8 @@ build_flag(FlagList) when is_list(FlagList) ->
       Acc bor F
     end, 0, FlagList).
 
-check_flag(Bin, Flag) when is_integer(Bin) andalso is_integer(Flag) ->
-  Bin band Flag =:= Flag.
+check_flag(Fg, Flag) when is_integer(Fg) andalso is_integer(Flag) ->
+  Fg band Flag =:= Flag.
 
 encode_reply_msg(ErrorCode) when is_atom(ErrorCode) ->
   ReplyBin = rpc_pb:encode_msg(#'xgame.reply_message'{error = atom_to_list2(ErrorCode)}),
@@ -77,6 +78,11 @@ decode_process_req(BinData) when is_binary(BinData) ->
   {ok, FromPid} = xrpc_util:decode_pid(Source),
   {ok, TargetPid, FromPid, decode_msg_by_name(MsgName, Payload)}.
 
+decode_packet(<<Flag:16/?UNSIGNINT, Seq:32/?UNSIGNINT, BinData/binary>>) ->
+  {ok, Flag, Seq, BinData}.
+encode_packet(Flag, Seq, BinData) ->
+  {ok, <<Flag:16/?UNSIGNINT, Seq:32/?UNSIGNINT, BinData/binary>>}.
+
 atom_to_list2(List) when is_list(List) ->
   List;
 atom_to_list2(Atom) when is_atom(Atom) ->
@@ -85,5 +91,4 @@ list_to_atom2(Atom) when is_atom(Atom) ->
   Atom;
 list_to_atom2(List) when is_list(List) ->
   list_to_atom(List).
-
 

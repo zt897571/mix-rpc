@@ -9,15 +9,17 @@ package main
 import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
-	"golang/common/process"
 	xgame "golang/proto"
+	"golang/xrpc"
 )
 
 type NodeCmd struct {
 }
 
 func (n *NodeCmd) GetPidList(_ *xgame.ReqGetPidList) (proto.Message, error) {
-	pids := process.GetProcessMgr().GetAllPids()
+	xrpc.GetCookie()
+
+	pids := xrpc.GetAllPids()
 	var pidsBin [][]byte
 	for _, pid := range pids {
 		pidsBin = append(pidsBin, pid.Encode())

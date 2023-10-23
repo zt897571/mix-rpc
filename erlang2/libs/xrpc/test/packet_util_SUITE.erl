@@ -17,7 +17,7 @@
 
 %% API
 all() ->
-  [flag_test, encode_mfa_test, encode_process_msg_test, encode_reply_test].
+  [flag_test, encode_mfa_test, encode_process_msg_test, encode_reply_test, encode_packet_test].
 
 flag_test(_) ->
   Flag = packet_util:build_flag([?REQ_FLAG, ?CALL_FLAG]),
@@ -49,3 +49,7 @@ encode_reply_test(_) ->
   ErrorCode = packet_util:decode_reply_msg(Bin1),
   {ok, TestMsg1} = packet_util:decode_reply_msg(Bin2),
   {ok, TestMsg2} = packet_util:decode_reply_msg(Bin3).
+
+encode_packet_test(_) ->
+  {ok, Bin} = packet_util:encode_packet(?VERIFY_REQ_MSG, 1, <<"test">>),
+  {ok, ?VERIFY_REQ_MSG, 1, <<"test">>} = packet_util:decode_packet(Bin).
