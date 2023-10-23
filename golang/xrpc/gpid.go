@@ -82,7 +82,7 @@ func newPid() iface.IPid {
 	}
 }
 
-func decodePid(bin []byte) (iface.IPid, error) {
+func DecodePid(bin []byte) (iface.IPid, error) {
 	if bin == nil {
 		return nil, error_code.PidFormatError
 	}

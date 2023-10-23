@@ -5,7 +5,7 @@
  * @Data: 2023/7/4 12:02
  */
 
-package net
+package xnet
 
 import "net"
 

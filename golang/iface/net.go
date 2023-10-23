@@ -6,6 +6,8 @@
 // -------------------------------------------
 package iface
 
+import "context"
+
 type INetMsgHandler interface {
 	OnReceiveMsg(msg []byte)
 	OnDisconnected()
@@ -14,7 +16,7 @@ type INetMsgHandler interface {
 }
 
 type IConnection interface {
-	Run()
+	Run(ctx context.Context)
 	Send([]byte) error
 	Close()
 	BindMsgHandler(INetMsgHandler)
@@ -23,7 +25,7 @@ type IConnection interface {
 }
 
 type INetServer interface {
-	Start(INewConnection, chan error)
+	Start(INewConnection, context.Context, chan error)
 	Stop()
 }
 

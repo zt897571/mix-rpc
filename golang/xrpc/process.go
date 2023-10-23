@@ -7,6 +7,7 @@
 package xrpc
 
 import (
+	"context"
 	"github.com/gogo/protobuf/proto"
 	"golang/common/log"
 	"golang/error_code"
@@ -44,9 +45,10 @@ type Process struct {
 	pid       iface.IPid
 	actor     iface.IActor
 	mailbox   chan *processMsg
-	stopChan  chan struct{}
 	status    Status
 	replyChan chan IRpcReplyMsg
+	cancel    context.CancelFunc
+	context   context.Context
 }
 
 var _ iface.IProcess = (*Process)(nil)
@@ -58,7 +60,6 @@ func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 		pid:       pid,
 		actor:     actor,
 		mailbox:   make(chan *processMsg, 10000),
-		stopChan:  make(chan struct{}, 1),
 		status:    Init,
 		replyChan: make(chan IRpcReplyMsg, 1),
 	}
@@ -76,12 +77,13 @@ func (p *Process) Run() {
 }
 
 func (p *Process) loop() {
+	p.context, p.cancel = context.WithCancel(context.Background())
 	p.status = Running
 	for {
 		select {
 		case Msg := <-p.mailbox:
 			Msg.callback()
-		case _ = <-p.stopChan:
+		case <-p.context.Done():
 			return
 		}
 	}
@@ -99,26 +101,8 @@ func (p *Process) Stop() {
 	if p.GetStatus() != Running {
 		return
 	}
-	p.stopChan <- struct{}{}
-}
-
-func (p *Process) StopAndWait() error {
-	if p.GetStatus() != Running {
-		return error_code.ProcessNotRunning
-	}
-	waitChan := make(chan struct{})
-	err := p.asyncRun(func() {
-		p.stopChan <- struct{}{}
-		waitChan <- struct{}{}
-	})
-	if err != nil {
-		return err
-	}
-	select {
-	case <-waitChan:
-		return nil
-	case <-time.After(time.Second * 5):
-		return error_code.TimeOutError
+	if p.cancel != nil {
+		p.cancel()
 	}
 }
 
@@ -149,13 +133,12 @@ func (p *Process) Call(target iface.IPid, pbMsg proto.Message, timeout time.Dura
 	if target == p.pid {
 		return nil, error_code.ProcessCanNotCallSelf
 	}
-	return innerCall(p.pid, target, pbMsg, timeout, p)
+	ctx, cancel := context.WithTimeout(p.context, timeout)
+	defer cancel()
+	return innerCall(p.pid, target, pbMsg, ctx, p)
 }
 
 func (p *Process) Cast(target iface.IPid, pbMsg proto.Message) error {
-	if target == nil || pbMsg == nil {
-		return error_code.ArgumentError
-	}
 	return innerCast(p.GetPid(), target, pbMsg)
 }
 
@@ -167,7 +150,7 @@ func (p *Process) GetPid() iface.IPid {
 	return p.pid
 }
 
-func (p *Process) onCallReq(msg IProcessReqMsg, responser IRpcReplyer) {
+func (p *Process) handleCall(msg IProcessReqMsg, responser IRpcReplyer) {
 	var rst proto.Message
 	var err error
 	if responser == nil {
@@ -215,11 +198,17 @@ func (p *Process) ReplyReq(_ uint32, message IRpcReplyMsg) error {
 	}
 }
 
+func (p *Process) onCall(msg IProcessReqMsg, replyer IProcessReqReplyer) error {
+	return p.asyncRun(func() {
+		p.handleCall(msg, replyer)
+	})
+}
+
 func (p *Process) GetActor() iface.IActor {
 	return p.actor
 }
 
-func getRpcProxy(target iface.IPid) (IRpcProxy, error) {
+func getRpcProxy(target iface.IPid) (*RpcProxy, error) {
 	if target == nil {
 		return nil, error_code.ArgumentError
 	}
@@ -231,41 +220,14 @@ func getRpcProxy(target iface.IPid) (IRpcProxy, error) {
 	return proxy, nil
 }
 
-type rawProcessReqReplyer struct {
-	channel chan IRpcReplyMsg
-}
-
-var _ IProcessReqReplyer = (*rawProcessReqReplyer)(nil)
-
-func newRawProcessReplyer() *rawProcessReqReplyer {
-	return &rawProcessReqReplyer{
-		channel: make(chan IRpcReplyMsg, 1),
-	}
-}
-
-func (t *rawProcessReqReplyer) getReplyChannel() chan IRpcReplyMsg {
-	return t.channel
-}
-
-func (t *rawProcessReqReplyer) ReplyReq(_ uint32, msg IRpcReplyMsg) error {
-	select {
-	case t.channel <- msg:
-		return nil
-	default:
-		return error_code.ChannelInvalid
-	}
-}
-
-func (t *rawProcessReqReplyer) getChannle() chan IRpcReplyMsg {
-	return t.channel
-}
-
 func Call(targetPid iface.IPid, msg proto.Message, timeout time.Duration) (proto.Message, error) {
 	if targetPid == nil || msg == nil {
 		return nil, error_code.ArgumentError
 	}
 	t := newRawProcessReplyer()
-	return innerCall(nil, targetPid, msg, timeout, t)
+	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
+	return innerCall(nil, targetPid, msg, ctx, t)
 }
 
 func Cast(targetPid iface.IPid, pbMsg proto.Message) error {
@@ -291,62 +253,49 @@ func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error
 			Target: targetPid.Encode(),
 			Params: rpcParams,
 		}
-		return proxy.SendProcessMsg(0, false, msg)
+		return proxy.sendMsg(0, constProcessCastFlag, msg)
 	}
 }
 
-func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, timeout time.Duration, replyer IProcessReqReplyer) (proto.Message, error) {
+func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context context.Context, replyer IProcessReqReplyer) (proto.Message, error) {
 	if targetPid.IsLocal() {
 		err := GetProcessMgr().DispatchCallMsg(newProcessReqMsg(from, targetPid, msg, true), replyer)
 		if err != nil {
 			return nil, err
 		}
-		rst, err := waitReply(timeout, replyer.getReplyChannel())
+		return waitReply(context, replyer.getReplyChannel())
+	} else {
+		proxy, err := getRpcProxy(targetPid)
 		if err != nil {
 			return nil, err
 		}
-		return rst.GetRpcResult()
-	} else {
-		return callRemote(from, targetPid, msg, timeout, replyer.getReplyChannel())
+		rpcParams, err := BuildRpcParams(msg)
+		if err != nil {
+			return nil, err
+		}
+		proMsg := &xgame.ProcessMsg{
+			Target: targetPid.Encode(),
+			Params: rpcParams,
+		}
+		if from != nil {
+			proMsg.Source = from.Encode()
+		}
+		seq := proxy.NextSeq()
+		proxy.RegSeq(seq, replyer.getReplyChannel())
+		defer proxy.UnRegSeq(seq)
+		err = proxy.sendMsg(seq, constProcessCallFlag, &xgame.ReqMessage{ProcessMsg: proMsg})
+		if err != nil {
+			return nil, err
+		}
+		return waitReply(context, replyer.getReplyChannel())
 	}
 }
 
-func callRemote(fromPid iface.IPid, targetPid iface.IPid, pbMsg proto.Message, timeout time.Duration, waitChan chan IRpcReplyMsg) (proto.Message, error) {
-	proxy, err := getRpcProxy(targetPid)
-	if err != nil {
-		return nil, err
-	}
-	rpcParams, err := BuildRpcParams(pbMsg)
-	if err != nil {
-		return nil, err
-	}
-	proMsg := &xgame.ProcessMsg{
-		Target: targetPid.Encode(),
-		Params: rpcParams,
-	}
-	if fromPid != nil {
-		proMsg.Source = fromPid.Encode()
-	}
-	seq := proxy.NextSeq()
-	proxy.RegSeq(seq, waitChan)
-	defer proxy.UnRegSeq(seq)
-	err = proxy.SendProcessMsg(seq, true, proMsg)
-	if err != nil {
-		return nil, err
-	}
-	rst, err := waitReply(timeout, waitChan)
-	if err != nil {
-		return nil, err
-	}
-	return rst.GetRpcResult()
-}
-
-// todo zhangtuo 改为使用context 整合超时流程和stop流程
-func waitReply(timeout time.Duration, waitChan chan IRpcReplyMsg) (IRpcReplyMsg, error) {
+func waitReply(ctx context.Context, waitChan chan IRpcReplyMsg) (proto.Message, error) {
 	select {
-	case <-time.After(timeout):
+	case <-ctx.Done():
 		return nil, error_code.TimeOutError
 	case rst := <-waitChan:
-		return rst, nil
+		return rst.GetRpcResult()
 	}
 }

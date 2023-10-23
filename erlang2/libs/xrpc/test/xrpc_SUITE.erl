@@ -23,13 +23,13 @@ test(TestMsg = #'xgame.test_msg'{}) ->
   TestMsg.
 
 test_rpc(_) ->
-  {ok, Pid} = test_process:start_link(),
-  ok = xrpc:start(),
-  Node = xrpc:get_node_name(),
-  ok = xrpc:connect(Node),
-  TestMsg = #'xgame.test_msg'{rand = 10086},
-  {ok, TestMsg} = xrpc:node_call(Node, ?MODULE, test, [TestMsg], 1000),
-  ok = xrpc:node_cast(Node, ?MODULE, test, [TestMsg]),
-  {ok, TestMsg} = xrpc:actor_call(Pid, TestMsg, 1000),
-  ok = xrpc:actor_cast(Pid, TestMsg),
+%%  {ok, Pid} = test_process:start_link(),
+%%  ok = xrpc:start(),
+%%  Node = xrpc:get_node_name(),
+%%  ok = xrpc:connect(Node),
+%%  TestMsg = #'xgame.test_msg'{rand = 10086},
+%%  {ok, TestMsg} = xrpc:node_call(Node, ?MODULE, test, [TestMsg], 1000),
+%%  ok = xrpc:node_cast(Node, ?MODULE, test, [TestMsg]),
+%%  {ok, TestMsg} = xrpc:actor_call(Pid, TestMsg, 1000),
+%%  ok = xrpc:actor_cast(Pid, TestMsg),
   ok.

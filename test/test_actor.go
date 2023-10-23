@@ -8,15 +8,15 @@ package main
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"golang/common/iface"
 	"golang/common/log"
-	"golang/common/process"
+	"golang/iface"
+	"golang/xrpc"
 )
 
 var pidList []iface.IPid
 
 func createProcess([]string) error {
-	pid, err := process.GetProcessMgr().CreateProcess(&TestActor{})
+	pid, err := xrpc.GetProcessMgr().CreateProcess(&TestActor{})
 	if err != nil {
 		return err
 	}

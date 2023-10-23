@@ -1,10 +1,10 @@
-// Package tcp -----------------------------
+// Package xnet -----------------------------
 // @file      : connection_config.go
 // @author    : zhangtuo
 // @contact   :
 // @time      : 2023/8/16 19:14
 // -------------------------------------------
-package net
+package xnet
 
 import "encoding/binary"
 

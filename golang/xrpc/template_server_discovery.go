@@ -7,7 +7,6 @@
 package xrpc
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -21,5 +20,5 @@ func newTemplateServerDiscovery() *nemplateServerDiscovery {
 
 func (t nemplateServerDiscovery) GetIpAddressByNode(s string) (string, error) {
 	sep := strings.Split(s, nodenameSep)
-	return fmt.Sprintf("%s:%s", sep[1], sep[2]), nil
+	return sep[1], nil
 }

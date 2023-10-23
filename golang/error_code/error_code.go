@@ -1,4 +1,4 @@
-// Package xrpc ----------------------------
+// Package error_code ----------------------------
 // @file      : error_code.go
 // @author    : zhangtuo
 // @contact   :
@@ -20,7 +20,7 @@ var ProcessReplyError = errors.New("process reply error")
 var ProcessNotRunning = errors.New("process not running")
 
 var RpcProxyNotFound = errors.New("rpc proxy not found")
-var RpcNodeNotConnected = errors.New("host not connected")
+var NodeNotConnected = errors.New("node not connected")
 
 var FunctionArgsCountError = errors.New("function agrs count error")
 var MfaError = errors.New("mfa error")
@@ -34,3 +34,5 @@ var NodeNameFormatError = errors.New("node name format error")
 var NodeAlreadyInit = errors.New("node already init")
 var VerifyError = errors.New("verify cookie error")
 var NodeAlreadyConnected = errors.New("node already connected")
+var NodeIsNotVerify = errors.New("node is not verify")
+var ContextDoneError = errors.New("context done error")

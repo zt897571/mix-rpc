@@ -75,3 +75,37 @@ func (p *processReqMsg) PreDecode() error {
 func (p *processReqMsg) Decode() error {
 	return nil
 }
+
+type rawProcessReqReplyer struct {
+	channel  chan IRpcReplyMsg
+	channel2 *timeoutChannel[IRpcReplyMsg]
+}
+
+var _ IProcessReqReplyer = (*rawProcessReqReplyer)(nil)
+
+func newRawProcessReplyer() *rawProcessReqReplyer {
+	return &rawProcessReqReplyer{
+		//channel: make(chan IRpcReplyMsg, 1),
+		channel2: newTimeoutChannel[IRpcReplyMsg](1),
+	}
+}
+
+func (t *rawProcessReqReplyer) getReplyChannel() chan IRpcReplyMsg {
+	return t.channel2.getChannel()
+	//return t.channel
+}
+
+func (t *rawProcessReqReplyer) ReplyReq(_ uint32, msg IRpcReplyMsg) error {
+	return t.channel2.write(msg)
+	//
+	//select {
+	//case t.channel <- msg:
+	//	return nil
+	//default:
+	//	return error_code.ChannelInvalid
+	//}
+}
+
+func (t *rawProcessReqReplyer) getChannle() chan IRpcReplyMsg {
+	return t.channel2.getChannel()
+}

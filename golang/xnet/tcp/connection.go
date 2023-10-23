@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"golang/common/log"
-	"golang/error_code"
 	"golang/iface"
-	net3 "golang/xnet"
+	"golang/xnet"
 	"io"
 	"net"
 	"time"
@@ -18,16 +17,17 @@ type TcpConnection struct {
 	activeTime int64
 	readChan   chan []byte
 	writeChan  chan []byte
-	cancel     context.CancelFunc
-	config     *net3.ConnectionConfig
+	config     *xnet.ConnectionConfig
 	msgHandler iface.INetMsgHandler
+	cancel     context.CancelFunc
+	context    context.Context
 }
 
 var _ iface.IConnection = (*TcpConnection)(nil)
 
-func NewConnectionInfo(conn net.Conn, config *net3.ConnectionConfig) *TcpConnection {
+func NewConnectionInfo(conn net.Conn, config *xnet.ConnectionConfig) *TcpConnection {
 	if config == nil {
-		config = net3.NewDefaultConnectionConfig()
+		config = xnet.NewDefaultConnectionConfig()
 	}
 	ci := &TcpConnection{
 		conn:       conn,
@@ -39,21 +39,16 @@ func NewConnectionInfo(conn net.Conn, config *net3.ConnectionConfig) *TcpConnect
 	return ci
 }
 
-func (ci *TcpConnection) ApplyOption(option ...net3.ConnectionOption) {
+func (ci *TcpConnection) ApplyOption(option ...xnet.ConnectionOption) {
 	for _, opt := range option {
 		opt(ci.conn)
 	}
 }
 
-func (ci *TcpConnection) Run() {
-	if ci.cancel != nil {
-		return
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	ci.cancel = cancel
-	defer ci.cancel()
-	go ci.handleLoop(ctx)
-	go ci.writeLoop(ctx)
+func (ci *TcpConnection) Run(ctx context.Context) {
+	ci.context, ci.cancel = context.WithCancel(ctx)
+	go ci.handleLoop(ci.context)
+	go ci.writeLoop(ci.context)
 	ci.recv()
 }
 
@@ -110,15 +105,17 @@ func (ci *TcpConnection) recv() {
 func (ci *TcpConnection) Send(msg []byte) error {
 	select {
 	case ci.writeChan <- msg:
-	default:
-		return error_code.ChannelIsFull
+		return nil
 	}
-	return nil
 }
 
 func (ci *TcpConnection) Close() {
 	if ci.cancel != nil {
 		ci.cancel()
+	}
+	err := ci.conn.Close()
+	if err != nil {
+		return
 	}
 }
 

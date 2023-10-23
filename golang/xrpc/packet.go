@@ -66,17 +66,26 @@ func (p *packet) GetRpcResult() (proto.Message, error) {
 	if p.isReq() {
 		return nil, error_code.PacketFormatError
 	}
-	response := &xgame.ReplyMessage{}
-	err := proto.Unmarshal(p.payload, response)
-	if err != nil {
-		return nil, err
+	if p.isVerifyMsg() {
+		response := &xgame.ReplyVerify{}
+		err := proto.Unmarshal(p.payload, response)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
+	} else {
+		response := &xgame.ReplyMessage{}
+		err := proto.Unmarshal(p.payload, response)
+		if err != nil {
+			return nil, err
+		}
+		if response.Error != "" {
+			return nil, errors.New(response.Error)
+		} else if response.MsgName != "" {
+			return GetProtoMsg(response.Payload, response.MsgName)
+		}
+		return nil, nil
 	}
-	if response.Error != "" {
-		return nil, errors.New(response.Error)
-	} else if response.MsgName != "" {
-		return GetProtoMsg(response.Payload, response.MsgName)
-	}
-	return nil, nil
 }
 
 type remoteProcessReqMsg struct {
@@ -105,7 +114,7 @@ func (p *remoteProcessReqMsg) PreDecode() error {
 	if req.ProcessMsg == nil {
 		return error_code.PacketFormatError
 	}
-	targetPid, err := decodePid(req.ProcessMsg.Target)
+	targetPid, err := DecodePid(req.ProcessMsg.Target)
 	if err != nil {
 		return err
 	}
@@ -120,7 +129,7 @@ func (p *remoteProcessReqMsg) Decode() error {
 	}
 	var from iface.IPid
 	if p.processMsg.Source != nil {
-		fromPid, err := decodePid(p.processMsg.Source)
+		fromPid, err := DecodePid(p.processMsg.Source)
 		if err != nil {
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 	"errors"
 	"golang/common/log"
 	"golang/iface"
-	net2 "golang/xnet"
+	"golang/xnet"
 	"net"
 	"sync/atomic"
 	"time"
@@ -22,21 +22,22 @@ type Server struct {
 	start      int32
 	addr       string
 	listen     net.Listener
-	connConfig *net2.ConnectionConfig
+	connConfig *xnet.ConnectionConfig
 	handler    iface.INewConnection
+	context    context.Context
 	cancel     context.CancelFunc
 }
 
 var _ iface.INetServer = (*Server)(nil)
 
-func NewServer(addr string, connConfig *net2.ConnectionConfig) *Server {
+func NewServer(addr string, connConfig *xnet.ConnectionConfig) *Server {
 	return &Server{
 		connConfig: connConfig,
 		addr:       addr,
 	}
 }
 
-func (s *Server) Start(handler iface.INewConnection, startedChannel chan error) {
+func (s *Server) Start(handler iface.INewConnection, ctx context.Context, startedChannel chan error) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -51,14 +52,11 @@ func (s *Server) Start(handler iface.INewConnection, startedChannel chan error) 
 	ls := net.ListenConfig{
 		KeepAlive: 15 * time.Second,
 	}
-	// todo zhangtuo root context
-	ctx, cancle := context.WithCancel(context.Background())
-	defer cancle()
-	s.listen, err = ls.Listen(ctx, "tcp", s.addr)
+	s.context, s.cancel = context.WithCancel(ctx)
+	s.listen, err = ls.Listen(s.context, "tcp", s.addr)
 	if err != nil {
 		return
 	}
-	s.cancel = cancle
 	func() {
 		defer s.onClose()
 		atomic.StoreInt32(&s.start, 1)
@@ -79,7 +77,9 @@ func (s *Server) Stop() {
 	if atomic.LoadInt32(&s.start) != 1 {
 		return
 	}
-	s.cancel()
+	if s.cancel != nil {
+		s.cancel()
+	}
 	s.onClose()
 }
 

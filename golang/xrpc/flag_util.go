@@ -22,6 +22,19 @@ const (
 	NODEMSG_FLAG            = 0b100
 	VERIFYMSG_FLAG          = 0b1000
 )
+const (
+	// node flag
+	constNodeCallFlag = NODEMSG_FLAG ^ REQ_FLAG ^ CALL_FLAG
+	constNodeCastFlag = NODEMSG_FLAG ^ REQ_FLAG
+
+	//verify msg flag
+	constVerifyReqFlag   = VERIFYMSG_FLAG ^ REQ_FLAG ^ CALL_FLAG
+	constVerifyReplyFlag = VERIFYMSG_FLAG ^ CALL_FLAG
+
+	// process msg flag
+	constProcessCallFlag = CALL_FLAG ^ REQ_FLAG
+	constProcessCastFlag = REQ_FLAG
+)
 
 func BuildFlag(flagList []FlagType) FlagType {
 	var flag FlagType

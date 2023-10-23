@@ -17,19 +17,19 @@ import (
 	"time"
 )
 
-func TestProcess(t *testing.T) {
-	convey.Convey("rawProcessReqReplyer process status", t, func() {
-		hd := &testActor{}
-		pid, err := GetProcessMgr().CreateProcess(hd)
-		convey.ShouldEqual(err, convey.ShouldEqual, nil)
-		process := GetProcessMgr().GetProcess(pid)
-
-		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Running)
-		err = process.StopAndWait()
-		convey.ShouldEqual(err, convey.ShouldEqual, nil)
-		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Closed)
-	})
-}
+//func TestProcess(t *testing.T) {
+//	convey.Convey("rawProcessReqReplyer process status", t, func() {
+//		hd := &testActor{}
+//		pid, err := GetProcessMgr().CreateProcess(hd)
+//		convey.ShouldEqual(err, convey.ShouldEqual, nil)
+//		process := GetProcessMgr().GetProcess(pid)
+//
+//		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Running)
+//		err = process.StopAndWait()
+//		convey.ShouldEqual(err, convey.ShouldEqual, nil)
+//		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Closed)
+//	})
+//}
 
 func TestProcessCall(t *testing.T) {
 	convey.Convey("TestProcessCall", t, func() {

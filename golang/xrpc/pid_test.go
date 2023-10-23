@@ -16,7 +16,7 @@ func TestEPid(t *testing.T) {
 		pidBin := []byte{131, 88, 100, 0, 26, 103, 97, 109, 101, 95, 115, 118, 114, 95, 49, 48,
 			48, 48, 49, 64, 49, 48, 46, 50, 46, 53, 56, 46, 50, 49, 48, 0, 0, 43, 226,
 			0, 0, 0, 3, 100, 222, 209, 114}
-		pid, err := decodePid(pidBin)
+		pid, err := DecodePid(pidBin)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(pid.GetNode(), convey.ShouldEqual, "game_svr_10001@10.2.58.210")
 		convey.So(pid.Encode(), convey.ShouldEqual, pidBin)
@@ -30,7 +30,7 @@ func TestGPid(t *testing.T) {
 			nodeName: "zhangtuo@10.2.58.210",
 		}
 		bin := pid.Encode()
-		decodePid, err := decodePid(bin)
+		decodePid, err := DecodePid(bin)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(decodePid, convey.ShouldEqual, pid)
 	})

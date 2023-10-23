@@ -63,7 +63,7 @@ func (p *ProcessMgr) DispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) 
 		return error_code.ProcessNotFound
 	}
 	return process.asyncRun(func() {
-		process.onCallReq(msg, responser)
+		process.handleCall(msg, responser)
 	})
 }
 
@@ -88,9 +88,9 @@ func (p *ProcessMgr) DispatchCastMsg(msg IProcessReqMsg) error {
 	})
 }
 
-func (p *ProcessMgr) GetAllPids() []iface.IPid {
+func GetAllPids() []iface.IPid {
 	var pids []iface.IPid
-	p.processMap.Range(func(key, value any) bool {
+	gProcessMgr.processMap.Range(func(key, value any) bool {
 		iPid := value.(iface.IProcess).GetPid()
 		pids = append(pids, iPid)
 		return true

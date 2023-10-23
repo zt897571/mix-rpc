@@ -7,6 +7,7 @@
 package xrpc
 
 import (
+	"context"
 	"github.com/gogo/protobuf/proto"
 	"golang/common/log"
 	"golang/error_code"
@@ -28,6 +29,7 @@ type Node struct {
 	server   iface2.INetServer
 	sd       iface2.IServerDiscovery // 服务发现
 	proxyMap sync.Map                // proxy集合
+	context  context.Context
 }
 
 var _ iface2.INode = (*Node)(nil)
@@ -46,7 +48,7 @@ func (n *Node) GetCookie() string {
 
 func (n *Node) OnNewConnection(connection iface2.IConnection) {
 	log.Infof("New Conneciton")
-	rpcProxy := newRpcProxy(connection)
+	rpcProxy := newRpcProxy(connection, true, "")
 	rpcProxy.run()
 }
 
@@ -58,18 +60,18 @@ func (n *Node) getServerDiscovery() iface2.IServerDiscovery {
 	return n.sd
 }
 
-func (n *Node) getProxy(nodename string) IRpcProxy {
+func (n *Node) getProxy(nodename string) *RpcProxy {
 	if k, ok := n.proxyMap.Load(nodename); ok {
-		return k.(IRpcProxy)
+		return k.(*RpcProxy)
 	}
 	return nil
 }
 
-func (n *Node) registerProxy(proxy IRpcProxy) {
+func (n *Node) registerProxy(proxy *RpcProxy) {
 	n.proxyMap.Store(proxy.GetNodeName(), proxy)
 }
 
-func (n *Node) removeProxy(proxy IRpcProxy) {
+func (n *Node) removeProxy(proxy *RpcProxy) {
 	n.proxyMap.Delete(proxy.GetNodeName())
 }
 
@@ -97,11 +99,16 @@ func Start(name string, cookie string) error {
 	if gNode != nil {
 		return error_code.NodeAlreadyInit
 	}
-	node := &Node{name: name, cookie: cookie, sd: newTemplateServerDiscovery()}
+	node := &Node{
+		name:    name,
+		cookie:  cookie,
+		sd:      newTemplateServerDiscovery(),
+		context: context.Background(),
+	}
 	ipaddress, err := node.getAddrByNode(name)
 	node.server = tcp2.NewServer(ipaddress, nil)
 	errChannel := make(chan error)
-	go node.server.Start(node, errChannel)
+	go node.server.Start(node, node.context, errChannel)
 	err = <-errChannel
 	if err != nil {
 		return err
@@ -127,13 +134,14 @@ func Connect(nodeName string) error {
 	if err != nil {
 		return err
 	}
-	rpcProxy := newRpcProxy(connection)
+	rpcProxy := newRpcProxy(connection, false, nodeName)
+	gNode.registerProxy(rpcProxy)
 	rpcProxy.run()
 	return nil
 }
 
 func IsValidNodeName(nodeName string) bool {
-	return len(strings.Split(nodeName, nodenameSep)) == 3
+	return len(strings.Split(nodeName, nodenameSep)) == 2
 }
 
 func NodeCast(nodeName string, mfa *xgame.PbMfa) error {
@@ -142,9 +150,9 @@ func NodeCast(nodeName string, mfa *xgame.PbMfa) error {
 	}
 	proxy := gNode.getProxy(nodeName)
 	if proxy == nil {
-		return error_code.RpcNodeNotConnected
+		return error_code.NodeNotConnected
 	}
-	return proxy.SendNodeMsg(0, false, mfa)
+	return proxy.sendMsg(0, constNodeCastFlag, &xgame.ReqMessage{NodeMsg: mfa})
 }
 
 func NodeCall(nodeName string, mfa *xgame.PbMfa, timeout time.Duration) (proto.Message, error) {
@@ -153,22 +161,9 @@ func NodeCall(nodeName string, mfa *xgame.PbMfa, timeout time.Duration) (proto.M
 	}
 	proxy := gNode.getProxy(nodeName)
 	if proxy == nil {
-		return nil, error_code.RpcNodeNotConnected
+		return nil, error_code.NodeNotConnected
 	}
-	seq := proxy.NextSeq()
-	replyChan := make(chan IRpcReplyMsg, 1)
-	proxy.RegSeq(seq, replyChan)
-	defer proxy.UnRegSeq(seq)
-	err := proxy.SendNodeMsg(seq, true, mfa)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case replyMsg := <-replyChan:
-		return replyMsg.GetRpcResult()
-	case <-time.After(timeout):
-		return nil, error_code.TimeOutError
-	}
+	return proxy.blockCall(constNodeCallFlag, &xgame.ReqMessage{NodeMsg: mfa}, timeout)
 }
 
 var mhMap = make(map[string]map[string]*FuncDesc)

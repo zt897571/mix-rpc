@@ -1,4 +1,4 @@
-// Package rpc -----------------------------
+// Package xrpc -----------------------------
 // @file      : node_msg_test.go
 // @author    : zhangtuo
 // @contact   :
@@ -18,7 +18,7 @@ import (
 
 var handler *TestNodeHandler
 var testCookie = "testcookie"
-var nodeName = "testnode1@localhost@8000"
+var nodeName = "testnode1@localhost:8000"
 
 func init() {
 	handler = newTestNodeHandler()
