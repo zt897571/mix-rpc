@@ -33,11 +33,6 @@ type IPid interface {
 	String() string
 }
 
-type INode interface {
-	GetNodeName() string
-	GetCookie() string
-}
-
 // IServerDiscovery 服务发现接口
 type IServerDiscovery interface {
 	GetIpAddressByNode(string) (string, error)

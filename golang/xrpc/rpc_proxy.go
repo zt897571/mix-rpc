@@ -135,6 +135,9 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 		var rst proto.Message
 		defer func() {
 			if pkg.isCall() {
+				if r := recover(); r != nil {
+					err = error_code.FunctionPanicError
+				}
 				msg := BuildReplyMsg(rst, err)
 				err = r.sendMsg(pkg.seq, 0, msg)
 				if err != nil {
@@ -151,7 +154,6 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 			err = error_code.MfaError
 			return
 		}
-		// todo:: zhangtuo recover
 		rst, err = applyMfa(reqMsg.NodeMsg)
 	}()
 }

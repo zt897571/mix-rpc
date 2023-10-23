@@ -32,8 +32,6 @@ type Node struct {
 	context  context.Context
 }
 
-var _ iface2.INode = (*Node)(nil)
-
 func (n *Node) String() string {
 	return n.name
 }
