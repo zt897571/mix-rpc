@@ -32,7 +32,7 @@ is_gpid_bin(_) ->
 is_valid_node(Node) when is_atom(Node) ->
   is_valid_node(atom_to_list(Node));
 is_valid_node(Node) when is_list(Node) ->
-  length(string:tokens(Node, "@")) == 3.
+  length(string:tokens(Node, "@")) == 2.
 
 get_node_by_pid(Binary) when is_binary(Binary) ->
   case decode_pid(Binary) of
@@ -56,6 +56,9 @@ encode_pid(Binary) when is_binary(Binary) ->
 
 decode_pid(Pid) when is_pid(Pid) ->
   {ok, Pid};
+%% 兼容source为空的情况
+decode_pid(<<>>) ->
+  {ok, <<>>};
 decode_pid(Binary) when is_binary(Binary) ->
   case is_epid_bin(Binary) of
     true ->
@@ -76,6 +79,7 @@ get_node_address(Node) ->
   case is_valid_node(Node) of
     false -> ?ERROR_NODE_TYPE;
     true ->
-      [_, Address, Port] = string:tokens(atom_to_list(Node), "@"),
-      {ok, {Address, Port}}
+      [_, IpAddress] = string:tokens(packet_util:atom_to_list2(Node), "@"),
+      [Host, PortStr] = string:tokens(IpAddress, ":"),
+      {ok, {Host, list_to_integer(PortStr)}}
   end.

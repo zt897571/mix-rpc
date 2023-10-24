@@ -13,40 +13,44 @@ import (
 	"sync"
 )
 
-var gProcessMgr = &ProcessMgr{}
+var gProcessMgr = &processMgr{}
 
-type ProcessMgr struct {
+type processMgr struct {
 	processMap sync.Map
 }
 
-func GetProcessMgr() *ProcessMgr {
-	return gProcessMgr
-}
-
-func (p *ProcessMgr) CreateProcess(actor iface.IActor) (iface.IPid, error) {
+func CreateProcess(actor iface.IActor) (iface.IPid, error) {
 	id := newPid()
 	process := newProcess(id, actor)
-	GetProcessMgr().RegisterProcess(process)
-	go process.Run()
+	gProcessMgr.registerProcess(process)
+	startedChan := make(chan struct{})
+	go process.run(startedChan)
+	<-startedChan
 	return id, nil
 }
 
-func (p *ProcessMgr) RegisterProcess(process *Process) {
-	p.processMap.Store(process.pid.String(), process)
-}
-
-func (p *ProcessMgr) GetProcess(pid iface.IPid) *Process {
-	if v, isOk := p.processMap.Load(pid.String()); isOk {
+func GetProcess(pid iface.IPid) *Process {
+	if v, isOk := gProcessMgr.processMap.Load(pid.String()); isOk {
 		return v.(*Process)
 	}
 	return nil
 }
 
-func (p *ProcessMgr) RemoveProcess(pid iface.IPid) {
+func StopProcess(pid iface.IPid) {
+	if process := GetProcess(pid); process != nil {
+		process.Stop()
+	}
+}
+
+func (p *processMgr) registerProcess(process *Process) {
+	p.processMap.Store(process.pid.String(), process)
+}
+
+func (p *processMgr) removeProcess(pid iface.IPid) {
 	p.processMap.Delete(pid.String())
 }
 
-func (p *ProcessMgr) DispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) error {
+func (p *processMgr) dispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) error {
 	if responser == nil || msg == nil {
 		return error_code.ArgumentError
 	}
@@ -58,7 +62,7 @@ func (p *ProcessMgr) DispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) 
 	if !targetPid.IsLocal() {
 		return error_code.ProcessNotFound
 	}
-	process := p.GetProcess(targetPid)
+	process := GetProcess(targetPid)
 	if process == nil {
 		return error_code.ProcessNotFound
 	}
@@ -67,7 +71,7 @@ func (p *ProcessMgr) DispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) 
 	})
 }
 
-func (p *ProcessMgr) DispatchCastMsg(msg IProcessReqMsg) error {
+func (p *processMgr) dispatchCastMsg(msg IProcessReqMsg) error {
 	if msg == nil {
 		return error_code.ArgumentError
 	}
@@ -79,7 +83,7 @@ func (p *ProcessMgr) DispatchCastMsg(msg IProcessReqMsg) error {
 	if !targetPid.IsLocal() {
 		return error_code.ProcessNotFound
 	}
-	process := p.GetProcess(targetPid)
+	process := GetProcess(targetPid)
 	if process == nil {
 		return error_code.ProcessNotFound
 	}

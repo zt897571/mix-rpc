@@ -17,3 +17,4 @@
 -define(ERROR_NODE_TYPE, error_node_type).
 -define(ERROR_COOKIE_VERIFY, error_cookie_verify).
 -define(ERROR_MSG_FORMAT, error_msg_format).
+-define(ERROR_RUN_MFA_ERROR, error_run_mfa_error).

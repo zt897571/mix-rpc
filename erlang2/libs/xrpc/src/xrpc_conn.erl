@@ -15,6 +15,7 @@
 -include("error_code.hrl").
 
 -define(RPC_SOCKET_OPTS, [{packet, 4}, {active, true}, {nodelay, true}]).
+
 -record(state, {
   node :: atom(),
   socket,
@@ -26,18 +27,18 @@
 
 %% API
 -export([start_link/4, start_link/3, start_link/1]).
--export([call/4, cast/2]).
+-export([call/5, cast/3]).
 -export([init/1, handle_call/3, handle_cast/2, terminate/2, handle_info/2, handle_continue/2]).
 
-call(Pid, Seq, Msg, Timeout) ->
-  case gen_server:call(Pid, {call_remote, Seq, ?NODECALLMSG, Msg}, Timeout) of
+call(Pid, Seq, Flag, ReqBin, Timeout) ->
+  case gen_server:call(Pid, {call_remote, Seq, Flag, ReqBin}, Timeout) of
     timeout -> timeout;
-    MsgBin when is_binary(MsgBin) ->
-      packet_util:decode_reply_msg(MsgBin)
+    ReplyBin when is_binary(ReplyBin) ->
+      packet_util:decode_reply_msg(ReplyBin)
   end.
 
-cast(Pid, Msg) ->
-  gen_server:cast(Pid, {cast_remote, ?NODECALLMSG, msg_pb:encode_msg(Msg)}).
+cast(Pid, Flag, Msg) ->
+  gen_server:cast(Pid, {cast_remote, Flag, Msg}).
 
 start_link(Ref, _Socket, Transport, Opt) ->
   start_link(Ref, Transport, Opt).
@@ -54,25 +55,25 @@ init({Ref, Transport, _}) ->
 
 init([Node]) ->
   {ok, {Address, Port}} = xrpc_util:get_node_address(Node),
-  case gen_tcp:connect(Address, list_to_integer(Port), ?RPC_SOCKET_OPTS) of
+  case gen_tcp:connect(Address, Port, [{packet, 4}, {active, false}]) of
     {ok, Socket} ->
-      Req = #'xgame.req_verify'{node = atom_to_list(node()), cookie = atom_to_list(erlang:get_cookie())},
-      {ok, BinData} = packet_util:encode_packet(?VERIFY_REQ_MSG, 0, rpc_pb:encode_msg(Req)),
-      ok = gen_tcp:send(Socket, BinData),
-      {ok, #state{node = Node, socket = Socket, transport = gen_tcp, seq_map = #{}, verify = false}};
+      {ok, Node} = req_verify(Socket),
+      ok = gen_tcp:controlling_process(Socket, self()),
+      ok = inet:setopts(Socket, ?RPC_SOCKET_OPTS),
+      {ok, #state{node = Node, socket = Socket, transport = gen_tcp, seq_map = #{}, verify = true}};
     {error, Reason} ->
       {stop, Reason};
     Other -> log("connect = ~p", [Other])
   end.
 
-terminate(Reason, _) ->
+terminate(Reason, #state{node = Node}) ->
   log("Terminate = ~p", [Reason]),
+  ok = xrpc_register:unregister_node(Node),
   ok.
 
-handle_continue(handshake, State = #state{ref = Ref, transport = Transport, node = Node}) ->
+handle_continue(handshake, State = #state{ref = Ref, transport = Transport}) ->
   {ok, Socket} = ranch:handshake(Ref),
   Transport:setopts(Socket, ?RPC_SOCKET_OPTS),
-  xrpc_register:register_node(Node, self()),
   {noreply, State#state{socket = Socket}}.
 
 handle_call({call_remote, Seq, Flag, Msg}, From, State = #state{socket = Socket, transport = Transport, seq_map = SeqMap}) ->
@@ -86,7 +87,7 @@ handle_cast({cast_remote, Flag, Msg}, State = #state{socket = Socket, transport 
   Transport:send(Socket, Binary),
   {noreply, State}.
 
-handle_info({tcp, _, <<Binary/binary>>}, State = #state{seq_map = SeqMap, verify = true}) ->
+handle_info({tcp, _, Binary}, State = #state{seq_map = SeqMap, verify = true}) ->
   {ok, Flag, Seq, BinData} = packet_util:decode_packet(Binary),
   case packet_util:check_flag(Flag, ?REQ_FLAG) of
     true ->
@@ -100,10 +101,10 @@ handle_info({tcp, _, <<Binary/binary>>}, State = #state{seq_map = SeqMap, verify
         undefined ->
           log("Seq not found wait pid =~p", [Seq]),
           {noreply, State};
-        Pid ->
+        From = {Pid, _} ->
           case is_process_alive(Pid) of
             true ->
-              gen_server:reply(Pid, BinData),
+              gen_server:reply(From, BinData),
               {noreply, State};
             false ->
               log("process = ~p is not Alive", [Pid]),
@@ -113,36 +114,50 @@ handle_info({tcp, _, <<Binary/binary>>}, State = #state{seq_map = SeqMap, verify
   end;
 
 %% 验证cookie
-handle_info({tcp, _, Binary}, State = #state{verify = false, socket = Socket, transport = Transport, node = UNode}) ->
+handle_info({tcp, _, <<Binary/binary>>}, State = #state{verify = false, socket = Socket, transport = Transport}) ->
   try
-    io:format("verify = ~p~n", [Binary]),
     {ok, Flag, Seq, Bin} = packet_util:decode_packet(Binary),
     true = packet_util:check_flag(Flag, ?VERIFY_FLAG),
-    case packet_util:check_flag(Flag, ?REQ_FLAG) of
+    true = packet_util:check_flag(Flag, ?REQ_FLAG),
+    #'xgame.req_verify'{node = Node, cookie = Cookie} = rpc_pb:decode_msg(Bin, 'xgame.req_verify'),
+    Cookie2 = list_to_atom(Cookie),
+    io:format("req cookie = ~p, local cookie = ~p~n", [Cookie2, erlang:get_cookie()]),
+    case Cookie2 == erlang:get_cookie() of
       true ->
-        #'xgame.req_verify'{node = Node, cookie = Cookie} = rpc_pb:decode_msg(Bin, 'xgame.req_verify'),
-        Cookie2 = list_to_atom(Cookie),
-        Cookie2 = erlang:get_cookie(),
-        Reply = #'xgame.reply_verify'{node = atom_to_list(node())},
+        Reply = #'xgame.reply_verify'{node = atom_to_list(xrpc:get_node_name())},
         {ok, BinData} = packet_util:encode_packet(?VERIFY_REPLY_MSG, Seq, rpc_pb:encode_msg(Reply)),
         Transport:send(Socket, BinData),
-        ok = xrpc_register:register_node(Node, self()),
-        {noreply, State#state{verify = true, node = Node}};
+        AtomNode = packet_util:list_to_atom2(Node),
+        ok = xrpc_register:register_node(AtomNode, self()),
+        {noreply, State#state{verify = true, node = AtomNode}};
       false ->
-        #'xgame.reply_verify'{node = Node} = rpc_pb:decode_msg(Bin, 'xgame.reply_verify'),
-        UNode = list_to_atom(Node),
-        ok = xrpc_register:register_node(Node, self()),
-        {noreply, State#state{verify = true}}
+        {stop, ?ERROR_COOKIE_VERIFY, State}
     end
   catch
     _ ->
       {stop, ?ERROR_COOKIE_VERIFY, State}
   end;
 
+handle_info({tcp_closed, _}, State) ->
+  {stop, normal, State};
+
 handle_info({'EXIT', _, _Reason}, State) ->
 %% todo:: zhangtuo retry register pid
   log("Request handleInfo = ~p ~n", []),
   {noreply, State}.
+
+req_verify(Socket) ->
+  Req = #'xgame.req_verify'{node = atom_to_list(node()), cookie = atom_to_list(erlang:get_cookie())},
+  {ok, BinData} = packet_util:encode_packet(?VERIFY_REQ_MSG, 0, rpc_pb:encode_msg(Req)),
+  ok = gen_tcp:send(Socket, BinData),
+  {ok, Packet} = gen_tcp:recv(Socket, 0, 5000),
+  {ok, Flag, _, Bin} = packet_util:decode_packet(Packet),
+  true = packet_util:check_flag(Flag, ?VERIFY_REPLY_MSG),
+  #'xgame.reply_verify'{node = Node} = rpc_pb:decode_msg(Bin, 'xgame.reply_verify'),
+  AtomNode = packet_util:list_to_atom2(Node),
+  ok = xrpc_register:register_node(AtomNode, self()),
+  {ok, AtomNode}.
+
 
 handle_node_req(Flag, Seq, Binary, #state{transport = Transport, socket = Socket}) ->
   Reply = run_pbmfa(Binary),
@@ -150,8 +165,8 @@ handle_node_req(Flag, Seq, Binary, #state{transport = Transport, socket = Socket
     true ->
       case packet_util:encode_reply_msg(Reply) of
         {ok, ReplyBin} ->
-          {ok, Binary} = packet_util:encode_packet(?NODE_REPLY_MSG, Seq, ReplyBin),
-          Transport:send(Socket, Binary);
+          {ok, BinData} = packet_util:encode_packet(?NODE_REPLY_MSG, Seq, ReplyBin),
+          Transport:send(Socket, BinData);
         Other ->
           log("build reply msg error = ~p", [Other])
       end;
@@ -164,11 +179,12 @@ handle_actor_req(Flag, Seq, BinData, #state{socket = Socket, transport = Transpo
     try
       {ok, TargetPid, FromPid, Msg} = packet_util:decode_process_req(BinData),
       case is_process_alive(TargetPid) of
-        false -> ?ERROR_PID_IS_NOT_ALIVE;
+        false ->
+          packet_util:encode_reply_msg(?ERROR_PID_IS_NOT_ALIVE);
         true ->
           case packet_util:check_flag(Flag, ?CALL_FLAG) of
             false ->
-              gen_server:cast(TargetPid, {go_msg, FromPid, Msg}),
+              gen_server:cast(TargetPid, {go_msg, Msg}),
               ignore;
             true ->
               {ok, Rst} = gen_server:call(TargetPid, {go_msg, FromPid, Msg}),
@@ -176,6 +192,7 @@ handle_actor_req(Flag, Seq, BinData, #state{socket = Socket, transport = Transpo
           end
       end
     catch _:{_, Error} ->
+      log("handle actor req error = ~p ~n", [Error]),
       packet_util:encode_reply_msg(Error)
     end,
   case Result of
@@ -189,7 +206,14 @@ log(Format, Args) ->
   io:format(Format, Args).
 
 run_pbmfa(Binary) when is_binary(Binary) ->
-  {ok, M, F, A} = packet_util:decode_mfa(Binary),
-  apply(M, F, [A]);
+  try
+    {ok, M, F, A} = packet_util:decode_mfa(Binary),
+    log("run mfa = ~p ~p ~p~n", [M, F, A]),
+    apply(M, F, [A])
+  catch
+    Error ->
+      log("run mfa err = ~p~n", Error),
+      ?ERROR_RUN_MFA_ERROR
+  end;
 run_pbmfa(_) ->
   ?ERROR_MFA_ARGS.

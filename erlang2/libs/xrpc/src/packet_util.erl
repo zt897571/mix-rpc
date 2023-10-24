@@ -14,7 +14,7 @@
 -include("error_code.hrl").
 
 %% API
--export([check_flag/2, build_flag/1, encode_reply_msg/1, decode_reply_msg/1]).
+-export([check_flag/2, build_flag/1, encode_reply_msg/1, decode_reply_msg/1, atom_to_list2/1, list_to_atom2/1]).
 -export([encode_mfa/3, decode_mfa/1, encode_process_req/3, decode_process_req/1, decode_packet/1, encode_packet/3]).
 
 build_flag(FlagList) when is_list(FlagList) ->
@@ -78,6 +78,9 @@ decode_process_req(BinData) when is_binary(BinData) ->
   {ok, FromPid} = xrpc_util:decode_pid(Source),
   {ok, TargetPid, FromPid, decode_msg_by_name(MsgName, Payload)}.
 
+
+decode_packet(StrBin) when is_list(StrBin) ->
+  decode_packet(list_to_binary(StrBin));
 decode_packet(<<Flag:16/?UNSIGNINT, Seq:32/?UNSIGNINT, BinData/binary>>) ->
   {ok, Flag, Seq, BinData}.
 encode_packet(Flag, Seq, BinData) ->

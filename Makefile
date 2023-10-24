@@ -9,7 +9,7 @@ golang:
 	cd golang/app/testnode && go build -o ./bin/testnode main.go
 
 start_erlang:
-	cd erlang2 && rebar3 release && cd _build/default/rel/test/bin && erlang console
+	cd erlang2 && rebar3 release && cd _build/default/rel/test/bin && test console
 
 proto:
 	protoc --gogoslick_out=./golang/proto -I=proto ./proto/*.proto

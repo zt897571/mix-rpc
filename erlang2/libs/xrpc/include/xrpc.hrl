@@ -18,8 +18,8 @@
 -define(NODECALLMSG, 2#111).
 -define(NODECASTMSG, 2#101).
 
--define(ACTORCALLMSG, 2#110).
--define(ACTORCASTMSG, 2#100).
+-define(ACTORCALLMSG, 2#011).
+-define(ACTORCASTMSG, 2#001).
 -define(VERIFY_REQ_MSG, 2#1001).
 
 %% reply
