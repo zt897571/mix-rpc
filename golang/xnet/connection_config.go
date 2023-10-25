@@ -19,7 +19,7 @@ func NewDefaultConnectionConfig() *ConnectionConfig {
 	return &ConnectionConfig{
 		ByteOrder:       binary.BigEndian,
 		PkgHeadLen:      4,
-		ReadChanelSize:  1000,
-		WriteChanelSize: 1000,
+		ReadChanelSize:  10000,
+		WriteChanelSize: 10000,
 	}
 }

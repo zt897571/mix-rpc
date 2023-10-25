@@ -20,9 +20,9 @@ type processReplyMsg struct {
 	err error
 }
 
-var _ IRpcReplyMsg = (*processReplyMsg)(nil)
+var _ iRpcReplyMsg = (*processReplyMsg)(nil)
 
-func (r *processReplyMsg) GetRpcResult() (proto.Message, error) {
+func (r *processReplyMsg) getRpcResult() (proto.Message, error) {
 	return r.msg, r.err
 }
 
@@ -37,69 +37,70 @@ type processReqMsg struct {
 	from   iface.IPid
 	target iface.IPid
 	msg    proto.Message
-	isCall bool
+	bCall  bool
 }
 
-var _ IProcessReqMsg = (*processReqMsg)(nil)
+var _ iProcessReqMsg = (*processReqMsg)(nil)
 
 func newProcessReqMsg(from iface.IPid, target iface.IPid, msg proto.Message, isCall bool) *processReqMsg {
 	return &processReqMsg{
 		from:   from,
 		target: target,
 		msg:    proto.Clone(msg),
-		isCall: isCall}
+		bCall:  isCall,
+	}
 }
 
-var _ IProcessReqMsg = (*processReqMsg)(nil)
+var _ iProcessReqMsg = (*processReqMsg)(nil)
 
-func (p *processReqMsg) GetSeq() uint32 {
+func (p *processReqMsg) getSeq() uint32 {
 	return 0
 }
 
-func (p *processReqMsg) GetFrom() iface.IPid {
+func (p *processReqMsg) getFrom() iface.IPid {
 	return p.from
 }
 
-func (p *processReqMsg) GetTarget() iface.IPid {
+func (p *processReqMsg) getTarget() iface.IPid {
 	return p.target
 }
 
-func (p *processReqMsg) IsCall() bool {
-	return p.isCall
+func (p *processReqMsg) isCall() bool {
+	return p.bCall
 }
 
-func (p *processReqMsg) GetPbMsg() proto.Message {
+func (p *processReqMsg) getPbMsg() proto.Message {
 	return p.msg
 }
 
-func (p *processReqMsg) PreDecode() error {
+func (p *processReqMsg) preDecode() error {
 	return nil
 }
 
-func (p *processReqMsg) Decode() error {
+func (p *processReqMsg) decode() error {
 	return nil
 }
 
 type rawProcessReqReplyer struct {
-	channel2 *timeoutChannel[IRpcReplyMsg]
+	channel2 *timeoutChannel[iRpcReplyMsg]
 }
 
-var _ IProcessReqReplyer = (*rawProcessReqReplyer)(nil)
+var _ iProcessReqReplyer = (*rawProcessReqReplyer)(nil)
 
 func newRawProcessReplyer() *rawProcessReqReplyer {
 	return &rawProcessReqReplyer{
-		channel2: newTimeoutChannel[IRpcReplyMsg](1),
+		channel2: newTimeoutChannel[iRpcReplyMsg](1),
 	}
 }
 
-func (t *rawProcessReqReplyer) getReplyChannel() chan IRpcReplyMsg {
+func (t *rawProcessReqReplyer) getReplyChannel() chan iRpcReplyMsg {
 	return t.channel2.getChannel()
 }
 
-func (t *rawProcessReqReplyer) ReplyReq(_ uint32, msg IRpcReplyMsg) error {
+func (t *rawProcessReqReplyer) replyReq(_ uint32, msg iRpcReplyMsg) error {
 	return t.channel2.write(msg)
 }
 
-func (t *rawProcessReqReplyer) getChannle() chan IRpcReplyMsg {
+func (t *rawProcessReqReplyer) getChannle() chan iRpcReplyMsg {
 	return t.channel2.getChannel()
 }

@@ -58,18 +58,18 @@ func (n *Node) getServerDiscovery() iface2.IServerDiscovery {
 	return n.sd
 }
 
-func (n *Node) getProxy(nodename string) *RpcProxy {
+func (n *Node) getProxy(nodename string) *rpcProxy {
 	if k, ok := n.proxyMap.Load(nodename); ok {
-		return k.(*RpcProxy)
+		return k.(*rpcProxy)
 	}
 	return nil
 }
 
-func (n *Node) registerProxy(proxy *RpcProxy) {
+func (n *Node) registerProxy(proxy *rpcProxy) {
 	n.proxyMap.Store(proxy.GetNodeName(), proxy)
 }
 
-func (n *Node) removeProxy(proxy *RpcProxy) {
+func (n *Node) removeProxy(proxy *rpcProxy) {
 	n.proxyMap.Delete(proxy.GetNodeName())
 }
 
@@ -184,7 +184,7 @@ func applyMfa(mfa *xgame.PbMfa) (proto.Message, error) {
 	if _, ok := funcMap[mfa.Function]; !ok {
 		return nil, error_code.MfaError
 	}
-	msg, err := GetProtoMsg(mfa.Args.Payload, mfa.Args.MsgName)
+	msg, err := getProtoMsg(mfa.Args.Payload, mfa.Args.MsgName)
 	if err != nil {
 		return nil, err
 	}

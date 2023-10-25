@@ -50,15 +50,15 @@ func (p *processMgr) removeProcess(pid iface.IPid) {
 	p.processMap.Delete(pid.String())
 }
 
-func (p *processMgr) dispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) error {
+func (p *processMgr) dispatchCallMsg(msg iProcessReqMsg, responser iRpcReplyer) error {
 	if responser == nil || msg == nil {
 		return error_code.ArgumentError
 	}
-	err := msg.PreDecode()
+	err := msg.preDecode()
 	if err != nil {
 		return err
 	}
-	targetPid := msg.GetTarget()
+	targetPid := msg.getTarget()
 	if !targetPid.IsLocal() {
 		return error_code.ProcessNotFound
 	}
@@ -71,15 +71,15 @@ func (p *processMgr) dispatchCallMsg(msg IProcessReqMsg, responser IRpcReplyer) 
 	})
 }
 
-func (p *processMgr) dispatchCastMsg(msg IProcessReqMsg) error {
+func (p *processMgr) dispatchCastMsg(msg iProcessReqMsg) error {
 	if msg == nil {
 		return error_code.ArgumentError
 	}
-	err := msg.PreDecode()
+	err := msg.preDecode()
 	if err != nil {
 		return err
 	}
-	targetPid := msg.GetTarget()
+	targetPid := msg.getTarget()
 	if !targetPid.IsLocal() {
 		return error_code.ProcessNotFound
 	}

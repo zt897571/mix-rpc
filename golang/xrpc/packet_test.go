@@ -15,17 +15,17 @@ import . "github.com/smartystreets/goconvey/convey"
 
 func TestFlag(t *testing.T) {
 	Convey("test flag", t, func() {
-		flag := BuildFlag([]FlagType{REQ_FLAG, CALL_FLAG})
-		So(CheckFlag(flag, REQ_FLAG), ShouldEqual, true)
-		So(CheckFlag(flag, CALL_FLAG), ShouldEqual, true)
-		So(CheckFlag(flag, NODEMSG_FLAG), ShouldEqual, false)
+		flag := buildFlag([]flagType{REQ_FLAG, CALL_FLAG})
+		So(checkFlag(flag, REQ_FLAG), ShouldEqual, true)
+		So(checkFlag(flag, CALL_FLAG), ShouldEqual, true)
+		So(checkFlag(flag, NODEMSG_FLAG), ShouldEqual, false)
 	})
 }
 
 func TestPacket(t *testing.T) {
 	Convey("test packet", t, func() {
 		//encode
-		flag := BuildFlag([]FlagType{REQ_FLAG, CALL_FLAG})
+		flag := buildFlag([]flagType{REQ_FLAG, CALL_FLAG})
 		testMsg := &xgame.TestMsg{Rand: 2023}
 		var seq uint32 = 10086
 		msgBin, err := buildMsg(flag, seq, testMsg)
