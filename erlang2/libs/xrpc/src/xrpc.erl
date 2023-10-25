@@ -33,18 +33,20 @@ port() ->
 
 get_node_name() ->
   {ok, Port} = port(),
-  NodeStr = lists:concat([atom_to_list(node()), "@", Port]),
+  NodeStr = lists:concat([atom_to_list(node()), ":", Port]),
   list_to_atom(NodeStr).
 
 connect(Node) ->
-  case xrpc_util:is_valid_node(Node) of
+  AtomNode = packet_util:list_to_atom2(Node),
+  case xrpc_util:is_valid_node(AtomNode) of
     false -> ?ERROR_NODE_TYPE;
     true ->
-      case xrpc_register:get_conn_pid_by_node(Node) of
+      case xrpc_register:get_conn_pid_by_node(AtomNode) of
         {ok, _} -> ok;
         _ ->
-          case xrpc_conn_sup:start_child(Node) of
-            {ok, _} -> ok;
+          case xrpc_conn_sup:start_child(AtomNode) of
+            {ok, _} ->
+              ok;
             Error -> Error
           end
       end
@@ -57,7 +59,7 @@ node_call(Node, Module, Fun, Args, Timeout) ->
       case xrpc_register:next_seq(Node) of
         {ok, Seq, Pid} ->
           {ok, ReqBin} = packet_util:encode_mfa(Module, Fun, Args),
-          xrpc_conn:call(Pid, Seq, ReqBin, Timeout);
+          xrpc_conn:call(Pid, Seq, ?NODECALLMSG, ReqBin, Timeout);
         Error ->
           Error
       end
@@ -70,7 +72,7 @@ node_cast(Node, Module, Fun, Args) ->
       case xrpc_register:get_conn_pid_by_node(Node) of
         {ok, Pid} ->
           {ok, ReqBin} = packet_util:encode_mfa(Module, Fun, Args),
-          xrpc_conn:cast(Pid, ReqBin);
+          xrpc_conn:cast(Pid, ?NODECASTMSG, ReqBin);
         Error -> Error
       end
   end.
@@ -85,8 +87,8 @@ actor_call(Pid, Msg, Timeout) ->
           {ok, Node} = xrpc_util:get_node_by_pid(Pid),
           case xrpc_register:next_seq(Node) of
             {ok, Seq, ConnPid} ->
-              {ok, ReqMsgBin} = packet_util:encode_process_req(Msg, Pid, self()),
-              xrpc_conn:call(ConnPid, Seq, ReqMsgBin, Timeout);
+              {ok, ReqMsgBin} = packet_util:encode_process_req(Pid, self(), Msg),
+              xrpc_conn:call(ConnPid, Seq, ?ACTORCALLMSG, ReqMsgBin, Timeout);
             Error -> Error
           end
       end
@@ -102,8 +104,8 @@ actor_cast(Pid, Msg) ->
           {ok, Node} = xrpc_util:get_node_by_pid(Pid),
           case xrpc_register:get_conn_pid_by_node(Node) of
             {ok, ConnPid} ->
-              {ok, ReqMsgBin} = packet_util:encode_process_req(Msg, Pid, self()),
-              xrpc_conn:cast(ConnPid, ReqMsgBin);
+              {ok, ReqMsgBin} = packet_util:encode_process_req(Pid, self(), Msg),
+              xrpc_conn:cast(ConnPid, ?ACTORCASTMSG, ReqMsgBin);
             Error -> Error
           end
       end

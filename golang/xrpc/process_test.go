@@ -22,7 +22,7 @@ import (
 //		hd := &testActor{}
 //		pid, err := GetProcessMgr().CreateProcess(hd)
 //		convey.ShouldEqual(err, convey.ShouldEqual, nil)
-//		process := GetProcessMgr().GetProcess(pid)
+//		process := GetProcessMgr().getProcess(pid)
 //
 //		convey.ShouldEqual(process.GetStatus(), convey.ShouldEqual, Running)
 //		err = process.StopAndWait()
@@ -48,15 +48,15 @@ func prepareActor(t *testing.T) (iface.IPid, iface.IPid) {
 	actor1 := newTestActor(t)
 	actor2 := newTestActor(t)
 
-	pid1, err := GetProcessMgr().CreateProcess(actor1)
-	process1 := GetProcessMgr().GetProcess(pid1)
+	pid1, err := CreateProcess(actor1)
+	process1 := GetProcess(pid1)
 	convey.So(process1, convey.ShouldNotEqual, nil)
 	convey.So(pid1, convey.ShouldNotEqual, nil)
 	convey.So(err, convey.ShouldEqual, nil)
 
 	// rawProcessReqReplyer create
-	pid2, err := GetProcessMgr().CreateProcess(actor2)
-	process2 := GetProcessMgr().GetProcess(pid2)
+	pid2, err := CreateProcess(actor2)
+	process2 := GetProcess(pid2)
 	convey.So(process2, convey.ShouldNotEqual, nil)
 	convey.So(err, convey.ShouldEqual, nil)
 	convey.So(pid2, convey.ShouldNotEqual, nil)
@@ -69,7 +69,7 @@ func prepareActor(t *testing.T) (iface.IPid, iface.IPid) {
 
 func testCall(sourcePid iface.IPid, targetPid iface.IPid, times int, t *testing.T, finishWg *sync.WaitGroup) {
 	convey.Convey("rawProcessReqReplyer callRemote", t, func() {
-		process := GetProcessMgr().GetProcess(sourcePid)
+		process := GetProcess(sourcePid)
 		convey.So(process, convey.ShouldNotEqual, nil)
 
 		var wg sync.WaitGroup
@@ -97,15 +97,15 @@ func testCall(sourcePid iface.IPid, targetPid iface.IPid, times int, t *testing.
 func BenchmarkProcess_Call(b *testing.B) {
 	actor1 := &testActor{}
 	actor2 := &testActor{}
-	pid1, err := GetProcessMgr().CreateProcess(actor1)
+	pid1, err := CreateProcess(actor1)
 	if err != nil {
 		b.FailNow()
 	}
-	pid2, err := GetProcessMgr().CreateProcess(actor2)
+	pid2, err := CreateProcess(actor2)
 	if err != nil {
 		b.FailNow()
 	}
-	process1 := GetProcessMgr().GetProcess(pid1)
+	process1 := GetProcess(pid1)
 	b.ResetTimer()
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -128,8 +128,8 @@ func BenchmarkProcess_Call(b *testing.B) {
 func TestProcess_Cast(t *testing.T) {
 	convey.Convey("rawProcessReqReplyer process cast", t, func() {
 		pid1, pid2 := prepareActor(t)
-		process1 := GetProcessMgr().GetProcess(pid1)
-		actor := GetProcessMgr().GetProcess(pid2).GetActor().(*testActor)
+		process1 := GetProcess(pid1)
+		actor := GetProcess(pid2).GetActor().(*testActor)
 		times := 500
 		var wg sync.WaitGroup
 		wg.Add(times)

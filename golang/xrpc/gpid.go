@@ -20,6 +20,7 @@ import (
 type gPid struct {
 	nodeName string
 	id       uint32
+	//time     uint64  todo:: zhangtuo fix this
 }
 
 var _ iface.IPid = (*gPid)(nil)
@@ -45,7 +46,6 @@ func (g *gPid) Encode() []byte {
 	for i, b := range []byte(g.nodeName) {
 		bin[7+i] = b
 	}
-	fmt.Println(bin)
 	return bin
 }
 
@@ -79,6 +79,7 @@ func newPid() iface.IPid {
 	return &gPid{
 		nodeName: GetNodeName(),
 		id:       nextId(),
+		//time:     time.Now().Unix(),
 	}
 }
 

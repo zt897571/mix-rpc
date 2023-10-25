@@ -24,18 +24,18 @@ var gCmd2Func = map[string]func(args []string) error{
 	"getRemotePidList": getRemotePidList,
 	"actorCall":        actorCall,
 	"actorCast":        actorCast,
-	"createProcess":    createProcess,
+	"testErlang":       testErlang,
+	"testGo":           testGo,
 }
 
 func main() {
 	flag.Parse()
-	addrSp := strings.Split(*gHost, ":")
-	nodeName2 := strings.Join([]string{*nodeName, addrSp[0], addrSp[1]}, ":")
-	err := xrpc.Start(nodeName2, "testcookie")
+	nodeName2 := strings.Join([]string{*nodeName, *gHost}, "@")
+	err := xrpc.Start(nodeName2, "test_cookie")
 	if err != nil {
 		return
 	}
-
+	log.Infof("Nodename = %s", nodeName2)
 	xrpc.RegisterNodeMsg("test", &NodeCmd{})
 
 	reader := bufio.NewReader(os.Stdin)
@@ -91,7 +91,8 @@ func nodecast(args []string) error {
 	if len(args) < 1 {
 		return error_code.ArgumentError
 	}
-	mfa, err := xrpc.BuildMfa("test", "TestNodeCast", &xgame.TestMsg{Msg: args[1]})
+	//mfa, err := xrpc.BuildMfa("test", "TestNodeCast", &xgame.TestMsg{Msg: args[1]})
+	mfa, err := xrpc.BuildMfa("test", "test_node_cast", &xgame.TestMsg{Msg: args[1]})
 	if err != nil {
 		return err
 	}
@@ -99,7 +100,8 @@ func nodecast(args []string) error {
 }
 
 func getRemotePidList(args []string) error {
-	mfa, err := xrpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
+	//mfa, err := xrpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
+	mfa, err := xrpc.BuildMfa("test", "get_pid", &xgame.ReqGetPidList{})
 	if err != nil {
 		return err
 	}
@@ -108,6 +110,7 @@ func getRemotePidList(args []string) error {
 		return err
 	}
 	replyMsg := reply.(*xgame.ReplyGetPidList)
+	remotePidList = remotePidList[:0]
 	for _, pidBin := range replyMsg.Pids {
 		decodePid, err := xrpc.DecodePid(pidBin)
 		if err != nil {
@@ -146,4 +149,116 @@ func safeExec(f func([]string) error, args []string) error {
 		}
 	}()
 	return f(args)
+}
+
+func testErlang(args []string) error {
+	node := args[0]
+	// 1.
+	err := xrpc.Connect(node)
+	if err != nil {
+		return err
+	}
+	// 2. node call test
+	mfa, err := xrpc.BuildMfa("test", "get_pid", &xgame.ReqGetPidList{})
+	if err != nil {
+		return err
+	}
+	reqReply, err := xrpc.NodeCall(node, mfa, time.Second)
+	if err != nil {
+		return err
+	}
+	// 3. node cast test
+	err = xrpc.NodeCast(node, mfa)
+	if err != nil {
+		return err
+	}
+	// 4. actor call test
+	var replyGetPidList *xgame.ReplyGetPidList
+	var ok bool
+	if replyGetPidList, ok = reqReply.(*xgame.ReplyGetPidList); !ok {
+		return error_code.LogicError
+	}
+	pid, err := xrpc.DecodePid(replyGetPidList.Pids[0])
+	if err != nil {
+		return err
+	}
+	err = xrpc.Cast(pid, &xgame.TestMsg{Msg: "test cast"})
+	if err != nil {
+		return err
+	}
+	_, err = xrpc.Call(pid, &xgame.TestMsg{Msg: "test call"}, time.Second*3)
+	if err != nil {
+		return err
+	}
+	//
+	proxyPid, err := xrpc.CreateProcess(&ProxyActor{pid: pid})
+	if err != nil {
+		return err
+	}
+	_, err = xrpc.Call(proxyPid, &xgame.TestMsg{Msg: "test call"}, time.Second*3)
+	if err != nil {
+		return err
+	}
+	err = xrpc.Cast(proxyPid, &xgame.TestMsg{Msg: "test cast"})
+	if err != nil {
+		return err
+	}
+	xrpc.StopProcess(proxyPid)
+	return nil
+}
+
+func testGo(args []string) error {
+	node := args[0]
+	// 1.
+	err := xrpc.Connect(node)
+	if err != nil {
+		return err
+	}
+	// 2. node call test
+	mfa, err := xrpc.BuildMfa("test", "GetPidList", &xgame.ReqGetPidList{})
+	if err != nil {
+		return err
+	}
+	reqReply, err := xrpc.NodeCall(node, mfa, time.Second)
+	if err != nil {
+		return err
+	}
+	// 3. node cast test
+	err = xrpc.NodeCast(node, mfa)
+	if err != nil {
+		return err
+	}
+	// 4. actor call test
+	var replyGetPidList *xgame.ReplyGetPidList
+	var ok bool
+	if replyGetPidList, ok = reqReply.(*xgame.ReplyGetPidList); !ok {
+		return error_code.LogicError
+	}
+	pid, err := xrpc.DecodePid(replyGetPidList.Pids[0])
+	if err != nil {
+		return err
+	}
+	err = xrpc.Cast(pid, &xgame.TestMsg{Msg: "test cast"})
+	if err != nil {
+		return err
+	}
+	_, err = xrpc.Call(pid, &xgame.TestMsg{Msg: "test call"}, time.Second*3)
+	if err != nil {
+		return err
+	}
+	//
+	proxyPid, err := xrpc.CreateProcess(&ProxyActor{pid: pid})
+	if err != nil {
+		return err
+	}
+	_, err = xrpc.Call(proxyPid, &xgame.TestMsg{Msg: "test call"}, time.Second*3)
+	if err != nil {
+		return err
+	}
+	err = xrpc.Cast(proxyPid, &xgame.TestMsg{Msg: "test cast"})
+	if err != nil {
+		return err
+	}
+	xrpc.StopProcess(proxyPid)
+	return nil
 }

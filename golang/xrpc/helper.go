@@ -7,8 +7,8 @@
 package xrpc
 
 import (
+	"context"
 	"golang/error_code"
-	"time"
 )
 
 type timeoutChannel[T any] struct {
@@ -25,13 +25,13 @@ func (t *timeoutChannel[T]) getChannel() chan T {
 	return t.channel
 }
 
-func (t *timeoutChannel[T]) blockRead(timeout time.Duration) (T, error) {
+func (t *timeoutChannel[T]) blockRead(ctx context.Context) (T, error) {
 	var defultValue T
 	select {
 	case value := <-t.channel:
 		return value, nil
-	case <-time.After(timeout):
-		return defultValue, error_code.TimeOutError
+	case <-ctx.Done():
+		return defultValue, ctx.Err()
 	}
 }
 

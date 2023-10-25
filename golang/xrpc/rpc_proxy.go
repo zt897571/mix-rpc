@@ -47,9 +47,10 @@ func newRpcProxy(connection iface.IConnection, isPassive bool, nodeName string) 
 func (r *RpcProxy) run() {
 	r.context, r.cancel = context.WithCancel(context.Background())
 	go func() {
-		defer gNode.removeProxy(r)
+		defer func() {
+			r.Close()
+		}()
 		r.conn.Run(r.context)
-		log.Infof("rpr proxy Stop = %v", r.nodename)
 	}()
 	r.tryVerify()
 }
@@ -76,18 +77,16 @@ func (r *RpcProxy) tryVerify() {
 		var rst proto.Message
 		defer func() {
 			if err != nil {
+				log.Errorf("Verify Reply Error Node = %v", r.nodename)
 				r.Close()
 			}
 		}()
 		rst, err = r.blockCall(constVerifyReqFlag, &xgame.ReqVerify{Cookie: GetCookie(), Node: GetNodeName()}, time.Second*5)
 		if err != nil {
-			log.Errorf("Req Verify Error Node = %v err= %v", r.nodename, err)
-			r.Close()
 			return
 		}
 		if replyMsg, ok := rst.(*xgame.ReplyVerify); !ok || replyMsg.Node != r.nodename {
-			log.Errorf("Verify Reply Error Node = %v", r.nodename)
-			r.Close()
+			err = error_code.VerifyError
 			return
 		} else {
 			r.verified = true
@@ -135,6 +134,9 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 		var rst proto.Message
 		defer func() {
 			if pkg.isCall() {
+				if r := recover(); r != nil {
+					err = error_code.FunctionPanicError
+				}
 				msg := BuildReplyMsg(rst, err)
 				err = r.sendMsg(pkg.seq, 0, msg)
 				if err != nil {
@@ -151,7 +153,6 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 			err = error_code.MfaError
 			return
 		}
-		// todo:: zhangtuo recover
 		rst, err = applyMfa(reqMsg.NodeMsg)
 	}()
 }
@@ -165,9 +166,9 @@ func (r *RpcProxy) handleProcessReqMsg(pkt *packet) {
 		return
 	}
 	if pkt.isCall() {
-		err = gProcessMgr.DispatchCallMsg(pkt.asprocessReqMsg2(), r)
+		err = gProcessMgr.dispatchCallMsg(pkt.asprocessReqMsg2(), r)
 	} else {
-		err = gProcessMgr.DispatchCastMsg(pkt.asprocessReqMsg2())
+		err = gProcessMgr.dispatchCastMsg(pkt.asprocessReqMsg2())
 	}
 	if err != nil {
 		log.Errorf("handle actor msg error = %v", err)
@@ -279,7 +280,9 @@ func (r *RpcProxy) blockCall(flag FlagType, msg proto.Message, timeout time.Dura
 	if err != nil {
 		return nil, err
 	}
-	rst, err := channel.blockRead(timeout)
+	ctx, cancel := context.WithTimeout(r.context, timeout)
+	defer cancel()
+	rst, err := channel.blockRead(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -302,6 +305,7 @@ func (r *RpcProxy) Close() {
 		r.conn.Close()
 		r.conn = nil
 	}
+	gNode.removeProxy(r)
 }
 
 func BuildMfa(module string, function string, args proto.Message) (*xgame.PbMfa, error) {

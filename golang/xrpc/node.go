@@ -32,8 +32,6 @@ type Node struct {
 	context  context.Context
 }
 
-var _ iface2.INode = (*Node)(nil)
-
 func (n *Node) String() string {
 	return n.name
 }
@@ -124,7 +122,7 @@ func Connect(nodeName string) error {
 	}
 	proxy := gNode.getProxy(nodeName)
 	if proxy != nil {
-		return error_code.NodeAlreadyConnected
+		return nil
 	}
 	ipAddress, err := gNode.getAddrByNode(nodeName)
 	if err != nil {

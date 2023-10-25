@@ -13,7 +13,7 @@
 -behavior(gen_server).
 
 %% API
--export([next_seq/1, unregister_node/1, register_node/2]).
+-export([next_seq/1, unregister_node/1, register_node/2, get_all_connected_nodes/0]).
 -export([start_link/0, init/1, handle_call/3, get_conn_pid_by_node/1, handle_info/2, handle_cast/2, terminate/2]).
 -record(node_info, {
   node :: atom(),
@@ -44,6 +44,10 @@ register_node(Node, Pid) ->
 unregister_node(Node) ->
   gen_server:call(?MODULE, {unregister_node, Node}).
 
+get_all_connected_nodes() ->
+  gen_server:call(?MODULE, get_all_node).
+
+
 handle_call({register_node, Node, Pid}, _, State = #state{nodeMap = NodeMap}) ->
   NewNodeInfo =
     case maps:get(Node, NodeMap, undefined) of
@@ -72,15 +76,18 @@ handle_call({get_next_seq, Node}, _, State = #state{nodeMap = NodeMap}) ->
       NewNodeMap = NodeMap#{Node => NodeInfo#node_info{seq = NewSeq}},
       {reply, {ok, NewSeq, Pid}, State#state{nodeMap = NewNodeMap}};
     undefined ->
-      %% todo zhangtuo try connect
       {reply, ?ERROR_NODE_NOT_CONNECTED, State}
   end;
+
+handle_call(get_all_node, _, State = #state{nodeMap = NodeMap}) ->
+  {reply, maps:keys(NodeMap), State};
 
 handle_call({get_conn_pid, Node}, _, State = #state{nodeMap = NodeMap}) ->
   case maps:get(Node, NodeMap, undefined) of
     #node_info{pid = Pid} -> {reply, {ok, Pid}, State};
     undefined -> {reply, ?ERROR_NODE_NOT_CONNECTED, State}
   end.
+
 
 handle_info({'EXIT', Pid, _Reason}, State = #state{nodeMap = NodeMap}) ->
   NodeTpList = maps:to_list(NodeMap),

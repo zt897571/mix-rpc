@@ -13,6 +13,7 @@ import (
 	"golang/error_code"
 	"golang/iface"
 	xgame "golang/proto"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -67,18 +68,15 @@ func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 	return p
 }
 
-func (p *Process) Run() {
+func (p *Process) run(startedChan chan struct{}) {
 	if p.status != Init {
 		return
 	}
 	defer p.OnStop()
 	p.actor.OnStart()
-	p.loop()
-}
-
-func (p *Process) loop() {
 	p.context, p.cancel = context.WithCancel(context.Background())
 	p.status = Running
+	startedChan <- struct{}{}
 	for {
 		select {
 		case Msg := <-p.mailbox:
@@ -120,7 +118,7 @@ func (p *Process) asyncRun(cb func()) error {
 
 func (p *Process) OnStop() {
 	p.status = Closing
-	GetProcessMgr().RemoveProcess(p.pid)
+	gProcessMgr.removeProcess(p.pid)
 	p.actor.OnStop()
 	p.status = Closed
 }
@@ -213,8 +211,16 @@ func getRpcProxy(target iface.IPid) (*RpcProxy, error) {
 		return nil, error_code.ArgumentError
 	}
 	nodeName := target.GetNode()
+	// todo: zhangtuo remove this
+	allNodes := gNode.GetAllNode()
+	for _, node := range allNodes {
+		if strings.Split(node, ":")[0] == nodeName {
+			nodeName = node
+		}
+	}
 	proxy := gNode.getProxy(nodeName)
 	if proxy == nil {
+
 		return nil, error_code.RpcProxyNotFound
 	}
 	return proxy, nil
@@ -239,7 +245,7 @@ func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error
 		return error_code.ArgumentError
 	}
 	if targetPid.IsLocal() {
-		return GetProcessMgr().DispatchCastMsg(newProcessReqMsg(from, targetPid, pbMsg, false))
+		return gProcessMgr.dispatchCastMsg(newProcessReqMsg(from, targetPid, pbMsg, false))
 	} else {
 		proxy, err := getRpcProxy(targetPid)
 		if err != nil {
@@ -253,13 +259,13 @@ func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error
 			Target: targetPid.Encode(),
 			Params: rpcParams,
 		}
-		return proxy.sendMsg(0, constProcessCastFlag, msg)
+		return proxy.sendMsg(0, constProcessCastFlag, &xgame.ReqMessage{ProcessMsg: msg})
 	}
 }
 
 func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context context.Context, replyer IProcessReqReplyer) (proto.Message, error) {
 	if targetPid.IsLocal() {
-		err := GetProcessMgr().DispatchCallMsg(newProcessReqMsg(from, targetPid, msg, true), replyer)
+		err := gProcessMgr.dispatchCallMsg(newProcessReqMsg(from, targetPid, msg, true), replyer)
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +300,7 @@ func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context
 func waitReply(ctx context.Context, waitChan chan IRpcReplyMsg) (proto.Message, error) {
 	select {
 	case <-ctx.Done():
-		return nil, error_code.TimeOutError
+		return nil, ctx.Err()
 	case rst := <-waitChan:
 		return rst.GetRpcResult()
 	}

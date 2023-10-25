@@ -25,7 +25,6 @@ type FuncDesc struct {
 }
 
 func (f *FuncDesc) SafeCall(params ...any) ([]reflect.Value, error) {
-	//todo:: recover()
 	if len(params) != f.InNum-1 {
 		return nil, error_code.FunctionArgsCountError
 	}

@@ -10,19 +10,8 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"golang/common/log"
 	"golang/iface"
-	"golang/xrpc"
+	"time"
 )
-
-var pidList []iface.IPid
-
-func createProcess([]string) error {
-	pid, err := xrpc.GetProcessMgr().CreateProcess(&TestActor{})
-	if err != nil {
-		return err
-	}
-	pidList = append(pidList, pid)
-	return nil
-}
 
 type TestActor struct {
 	iface.IProcess
@@ -47,4 +36,33 @@ func (t *TestActor) HandleCast(from iface.IPid, msg proto.Message) {
 func (t *TestActor) HandleCall(from iface.IPid, msg proto.Message) (proto.Message, error) {
 	log.Infof("Receive Actor Call from = %v, msg = %v", from, msg)
 	return msg, nil
+}
+
+type ProxyActor struct {
+	iface.IProcess
+	pid iface.IPid
+}
+
+func (p *ProxyActor) SetProcess(process iface.IProcess) {
+	p.IProcess = process
+}
+
+func (p *ProxyActor) OnStart() {
+}
+
+func (p *ProxyActor) OnStop() {
+}
+
+func (p *ProxyActor) HandleCast(from iface.IPid, msg proto.Message) {
+	log.Infof("recevie cast msg")
+	err := p.Cast(p.pid, msg)
+	if err != nil {
+		log.Errorf("Cast Error")
+	}
+	return
+}
+
+func (p *ProxyActor) HandleCall(from iface.IPid, msg proto.Message) (proto.Message, error) {
+	log.Infof("recevie call  msg")
+	return p.Call(p.pid, msg, time.Second)
 }

@@ -7,11 +7,9 @@
 package xrpc
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/proto"
 	xgame "golang/proto"
 	"reflect"
-	"strings"
 )
 
 type FlagType uint16
@@ -49,10 +47,6 @@ func CheckFlag(flag FlagType, flagType FlagType) bool {
 }
 
 func GetProtoMsg(msg []byte, messageName string) (proto.Message, error) {
-	// todo: zhangtuo fix this (兼容golang message name)
-	if strings.Index(messageName, ".") == -1 {
-		messageName = fmt.Sprintf("xgame.%s", messageName)
-	}
 	tp := proto.MessageType(messageName)
 	protoMsg := reflect.New(tp.Elem()).Interface().(proto.Message)
 	err := proto.Unmarshal(msg, protoMsg)
