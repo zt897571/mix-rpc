@@ -18,43 +18,43 @@ import (
 	"time"
 )
 
-type Status int32
+type processStatus int32
 
 const (
-	Init Status = iota
+	Init processStatus = iota
 	Running
 	Closing
 	Closed
 )
 
-type IProcessReqReplyer interface {
-	IRpcReplyer
-	getReplyChannel() chan IRpcReplyMsg
+type iProcessReqReplyer interface {
+	iRpcReplyer
+	getReplyChannel() chan iRpcReplyMsg
 }
 
-type IProcessReqMsg interface {
-	GetSeq() uint32
-	GetFrom() iface.IPid
-	GetTarget() iface.IPid
-	IsCall() bool
-	GetPbMsg() proto.Message
-	PreDecode() error
-	Decode() error
+type iProcessReqMsg interface {
+	getSeq() uint32
+	getFrom() iface.IPid
+	getTarget() iface.IPid
+	isCall() bool
+	getPbMsg() proto.Message
+	preDecode() error
+	decode() error
 }
 
 type Process struct {
 	pid       iface.IPid
 	actor     iface.IActor
 	mailbox   chan *processMsg
-	status    Status
-	replyChan chan IRpcReplyMsg
+	status    processStatus
+	replyChan chan iRpcReplyMsg
 	cancel    context.CancelFunc
 	context   context.Context
 }
 
 var _ iface.IProcess = (*Process)(nil)
-var _ IRpcReplyer = (*Process)(nil)
-var _ IProcessReqReplyer = (*Process)(nil)
+var _ iRpcReplyer = (*Process)(nil)
+var _ iProcessReqReplyer = (*Process)(nil)
 
 func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 	p := &Process{
@@ -62,7 +62,7 @@ func newProcess(pid iface.IPid, actor iface.IActor) *Process {
 		actor:     actor,
 		mailbox:   make(chan *processMsg, 10000),
 		status:    Init,
-		replyChan: make(chan IRpcReplyMsg, 1),
+		replyChan: make(chan iRpcReplyMsg, 1),
 	}
 	actor.SetProcess(p)
 	return p
@@ -75,7 +75,7 @@ func (p *Process) run(startedChan chan struct{}) {
 	defer p.OnStop()
 	p.actor.OnStart()
 	p.context, p.cancel = context.WithCancel(context.Background())
-	p.status = Running
+	p.setStatus(Running)
 	startedChan <- struct{}{}
 	for {
 		select {
@@ -87,16 +87,16 @@ func (p *Process) run(startedChan chan struct{}) {
 	}
 }
 
-func (p *Process) GetStatus() Status {
-	return Status(atomic.LoadInt32((*int32)(&p.status)))
+func (p *Process) getStatus() processStatus {
+	return processStatus(atomic.LoadInt32((*int32)(&p.status)))
 }
 
-func (p *Process) SetStatus(st Status) {
+func (p *Process) setStatus(st processStatus) {
 	atomic.StoreInt32((*int32)(&p.status), int32(st))
 }
 
 func (p *Process) Stop() {
-	if p.GetStatus() != Running {
+	if p.getStatus() != Running {
 		return
 	}
 	if p.cancel != nil {
@@ -105,7 +105,7 @@ func (p *Process) Stop() {
 }
 
 func (p *Process) asyncRun(cb func()) error {
-	if p.GetStatus() != Running {
+	if p.getStatus() != Running {
 		return error_code.ProcessNotRunning
 	}
 	select {
@@ -117,10 +117,10 @@ func (p *Process) asyncRun(cb func()) error {
 }
 
 func (p *Process) OnStop() {
-	p.status = Closing
+	p.setStatus(Closing)
 	gProcessMgr.removeProcess(p.pid)
 	p.actor.OnStop()
-	p.status = Closed
+	p.setStatus(Closed)
 }
 
 // Call 只能在本携程调用
@@ -140,7 +140,7 @@ func (p *Process) Cast(target iface.IPid, pbMsg proto.Message) error {
 	return innerCast(p.GetPid(), target, pbMsg)
 }
 
-func (p *Process) getReplyChannel() chan IRpcReplyMsg {
+func (p *Process) getReplyChannel() chan iRpcReplyMsg {
 	return p.replyChan
 }
 
@@ -148,7 +148,7 @@ func (p *Process) GetPid() iface.IPid {
 	return p.pid
 }
 
-func (p *Process) handleCall(msg IProcessReqMsg, responser IRpcReplyer) {
+func (p *Process) handleCall(msg iProcessReqMsg, responser iRpcReplyer) {
 	var rst proto.Message
 	var err error
 	if responser == nil {
@@ -160,34 +160,34 @@ func (p *Process) handleCall(msg IProcessReqMsg, responser IRpcReplyer) {
 			log.Errorf("function panic %v", r)
 			err = error_code.FunctionPanicError
 		}
-		err = responser.ReplyReq(msg.GetSeq(), newRawProcessResponse(rst, err))
+		err = responser.replyReq(msg.getSeq(), newRawProcessResponse(rst, err))
 		if err != nil {
 			log.Errorf("reply msg error = %v", err)
 			return
 		}
 	}()
-	err = msg.Decode()
+	err = msg.decode()
 	if err != nil {
 		return
 	}
-	rst, err = p.actor.HandleCall(msg.GetFrom(), msg.GetPbMsg())
+	rst, err = p.actor.HandleCall(msg.getFrom(), msg.getPbMsg())
 }
 
-func (p *Process) onCastReq(msg IProcessReqMsg) {
+func (p *Process) onCastReq(msg iProcessReqMsg) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("function panic = %v", r)
 			return
 		}
 	}()
-	err := msg.Decode()
+	err := msg.decode()
 	if err != nil {
 		return
 	}
-	p.actor.HandleCast(msg.GetFrom(), msg.GetPbMsg())
+	p.actor.HandleCast(msg.getFrom(), msg.getPbMsg())
 }
 
-func (p *Process) ReplyReq(_ uint32, message IRpcReplyMsg) error {
+func (p *Process) replyReq(_ uint32, message iRpcReplyMsg) error {
 	select {
 	case p.replyChan <- message:
 		return nil
@@ -196,7 +196,7 @@ func (p *Process) ReplyReq(_ uint32, message IRpcReplyMsg) error {
 	}
 }
 
-func (p *Process) onCall(msg IProcessReqMsg, replyer IProcessReqReplyer) error {
+func (p *Process) onCall(msg iProcessReqMsg, replyer iProcessReqReplyer) error {
 	return p.asyncRun(func() {
 		p.handleCall(msg, replyer)
 	})
@@ -206,7 +206,7 @@ func (p *Process) GetActor() iface.IActor {
 	return p.actor
 }
 
-func getRpcProxy(target iface.IPid) (*RpcProxy, error) {
+func getRpcProxy(target iface.IPid) (*rpcProxy, error) {
 	if target == nil {
 		return nil, error_code.ArgumentError
 	}
@@ -251,7 +251,7 @@ func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error
 		if err != nil {
 			return err
 		}
-		rpcParams, err := BuildRpcParams(pbMsg)
+		rpcParams, err := buildRpcParams(pbMsg)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func innerCast(from iface.IPid, targetPid iface.IPid, pbMsg proto.Message) error
 	}
 }
 
-func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context context.Context, replyer IProcessReqReplyer) (proto.Message, error) {
+func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context context.Context, replyer iProcessReqReplyer) (proto.Message, error) {
 	if targetPid.IsLocal() {
 		err := gProcessMgr.dispatchCallMsg(newProcessReqMsg(from, targetPid, msg, true), replyer)
 		if err != nil {
@@ -275,7 +275,7 @@ func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context
 		if err != nil {
 			return nil, err
 		}
-		rpcParams, err := BuildRpcParams(msg)
+		rpcParams, err := buildRpcParams(msg)
 		if err != nil {
 			return nil, err
 		}
@@ -297,11 +297,11 @@ func innerCall(from iface.IPid, targetPid iface.IPid, msg proto.Message, context
 	}
 }
 
-func waitReply(ctx context.Context, waitChan chan IRpcReplyMsg) (proto.Message, error) {
+func waitReply(ctx context.Context, waitChan chan iRpcReplyMsg) (proto.Message, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case rst := <-waitChan:
-		return rst.GetRpcResult()
+		return rst.getRpcResult()
 	}
 }

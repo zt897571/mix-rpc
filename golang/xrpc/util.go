@@ -1,4 +1,4 @@
-// Package utils -----------------------------
+// Package xrpc -----------------------------
 // @file      : util.go
 // @author    : zhangtuo
 // @contact   :

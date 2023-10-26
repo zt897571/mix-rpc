@@ -18,15 +18,15 @@ import (
 	"time"
 )
 
-type IRpcReplyer interface {
-	ReplyReq(seq uint32, message IRpcReplyMsg) error
+type iRpcReplyer interface {
+	replyReq(seq uint32, message iRpcReplyMsg) error
 }
 
-type IRpcReplyMsg interface {
-	GetRpcResult() (proto.Message, error)
+type iRpcReplyMsg interface {
+	getRpcResult() (proto.Message, error)
 }
 
-type RpcProxy struct {
+type rpcProxy struct {
 	seq          uint32
 	conn         iface.IConnection
 	reqWaitMap   sync.Map
@@ -38,13 +38,13 @@ type RpcProxy struct {
 	verifyCancel context.CancelFunc
 }
 
-func newRpcProxy(connection iface.IConnection, isPassive bool, nodeName string) *RpcProxy {
-	r := &RpcProxy{conn: connection, isPassive: isPassive, nodename: nodeName}
+func newRpcProxy(connection iface.IConnection, isPassive bool, nodeName string) *rpcProxy {
+	r := &rpcProxy{conn: connection, isPassive: isPassive, nodename: nodeName}
 	connection.BindMsgHandler(r)
 	return r
 }
 
-func (r *RpcProxy) run() {
+func (r *rpcProxy) run() {
 	r.context, r.cancel = context.WithCancel(context.Background())
 	go func() {
 		defer func() {
@@ -55,7 +55,7 @@ func (r *RpcProxy) run() {
 	r.tryVerify()
 }
 
-func (r *RpcProxy) tryVerify() {
+func (r *rpcProxy) tryVerify() {
 	if r.verified {
 		return
 	}
@@ -96,7 +96,7 @@ func (r *RpcProxy) tryVerify() {
 	}
 }
 
-func (r *RpcProxy) OnReceiveMsg(payload []byte) {
+func (r *rpcProxy) OnReceiveMsg(payload []byte) {
 	pkg, err := newPacket(payload)
 	if err != nil {
 		log.Errorf("parse packet error = %v", err)
@@ -128,7 +128,7 @@ func (r *RpcProxy) OnReceiveMsg(payload []byte) {
 }
 
 // 处理node消息
-func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
+func (r *rpcProxy) handleNodeReqMsg(pkg *packet) {
 	go func() {
 		var err error
 		var rst proto.Message
@@ -137,7 +137,7 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 				if r := recover(); r != nil {
 					err = error_code.FunctionPanicError
 				}
-				msg := BuildReplyMsg(rst, err)
+				msg := buildReplyMsg(rst, err)
 				err = r.sendMsg(pkg.seq, 0, msg)
 				if err != nil {
 					log.Errorf("Reply Request error = %v", err)
@@ -158,7 +158,7 @@ func (r *RpcProxy) handleNodeReqMsg(pkg *packet) {
 }
 
 // 处理actor消息
-func (r *RpcProxy) handleProcessReqMsg(pkt *packet) {
+func (r *rpcProxy) handleProcessReqMsg(pkt *packet) {
 	reqMsg := &xgame.ReqMessage{}
 	err := proto.Unmarshal(pkt.payload, reqMsg)
 	if err != nil {
@@ -177,7 +177,7 @@ func (r *RpcProxy) handleProcessReqMsg(pkt *packet) {
 }
 
 // 节点验证消息
-func (r *RpcProxy) handleVerifyMsg(pkt *packet) {
+func (r *rpcProxy) handleVerifyMsg(pkt *packet) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -189,7 +189,7 @@ func (r *RpcProxy) handleVerifyMsg(pkt *packet) {
 		err = error_code.VerifyError
 		return
 	}
-	if CheckFlag(pkt.flag, REQ_FLAG) {
+	if checkFlag(pkt.flag, REQ_FLAG) {
 		reqMsg := &xgame.ReqVerify{}
 		err = proto.Unmarshal(pkt.payload, reqMsg)
 		if err != nil {
@@ -216,52 +216,52 @@ func (r *RpcProxy) handleVerifyMsg(pkt *packet) {
 	}
 }
 
-func (r *RpcProxy) NextSeq() uint32 {
+func (r *rpcProxy) NextSeq() uint32 {
 	return atomic.AddUint32(&r.seq, 1)
 }
 
-func (r *RpcProxy) RegSeq(seq uint32, replyBin chan IRpcReplyMsg) {
+func (r *rpcProxy) RegSeq(seq uint32, replyBin chan iRpcReplyMsg) {
 	r.reqWaitMap.Store(seq, replyBin)
 }
 
-func (r *RpcProxy) UnRegSeq(seq uint32) {
+func (r *rpcProxy) UnRegSeq(seq uint32) {
 	r.reqWaitMap.Delete(seq)
 }
 
-func (r *RpcProxy) getRegChan(seq uint32) chan IRpcReplyMsg {
+func (r *rpcProxy) getRegChan(seq uint32) chan iRpcReplyMsg {
 	if anyChan, ok := r.reqWaitMap.Load(seq); ok {
-		return anyChan.(chan IRpcReplyMsg)
+		return anyChan.(chan iRpcReplyMsg)
 	}
 	return nil
 }
 
-func (r *RpcProxy) GetNodeName() string {
+func (r *rpcProxy) GetNodeName() string {
 	return r.nodename
 }
 
-func (r *RpcProxy) ReplyReq(seq uint32, replyMsg IRpcReplyMsg) error {
+func (r *rpcProxy) replyReq(seq uint32, replyMsg iRpcReplyMsg) error {
 	if replyMsg == nil {
 		return error_code.ArgumentError
 	}
-	return r.sendMsg(seq, 0, BuildReplyMsg(replyMsg.GetRpcResult()))
+	return r.sendMsg(seq, 0, buildReplyMsg(replyMsg.getRpcResult()))
 }
 
-func (r *RpcProxy) OnDisconnected() {
+func (r *rpcProxy) OnDisconnected() {
 }
 
-func (r *RpcProxy) SetConnection(conn iface.IConnection) {
+func (r *rpcProxy) SetConnection(conn iface.IConnection) {
 	r.conn = conn
 }
 
-func (r *RpcProxy) GetConnection() iface.IConnection {
+func (r *rpcProxy) GetConnection() iface.IConnection {
 	return r.conn
 }
 
-func (r *RpcProxy) sendMsg(seq uint32, flag FlagType, msg proto.Message) error {
+func (r *rpcProxy) sendMsg(seq uint32, flag flagType, msg proto.Message) error {
 	if r.conn == nil {
 		return error_code.NodeNotConnected
 	}
-	if !r.verified && !CheckFlag(flag, VERIFYMSG_FLAG) {
+	if !r.verified && !checkFlag(flag, VERIFYMSG_FLAG) {
 		return error_code.NodeIsNotVerify
 	}
 	msgBin, err := buildMsg(flag, seq, msg)
@@ -271,8 +271,8 @@ func (r *RpcProxy) sendMsg(seq uint32, flag FlagType, msg proto.Message) error {
 	return r.conn.Send(msgBin)
 }
 
-func (r *RpcProxy) blockCall(flag FlagType, msg proto.Message, timeout time.Duration) (proto.Message, error) {
-	channel := newTimeoutChannel[IRpcReplyMsg](1)
+func (r *rpcProxy) blockCall(flag flagType, msg proto.Message, timeout time.Duration) (proto.Message, error) {
+	channel := newTimeoutChannel[iRpcReplyMsg](1)
 	seq := r.NextSeq()
 	r.RegSeq(seq, channel.getChannel())
 	defer r.UnRegSeq(seq)
@@ -286,10 +286,10 @@ func (r *RpcProxy) blockCall(flag FlagType, msg proto.Message, timeout time.Dura
 	if err != nil {
 		return nil, err
 	}
-	return rst.GetRpcResult()
+	return rst.getRpcResult()
 }
 
-func (r *RpcProxy) SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error {
+func (r *rpcProxy) SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg) error {
 	flag := constProcessCastFlag
 	if isCall {
 		flag = constProcessCallFlag
@@ -297,7 +297,7 @@ func (r *RpcProxy) SendProcessMsg(seq uint32, isCall bool, msg *xgame.ProcessMsg
 	return r.sendMsg(seq, flag, &xgame.ReqMessage{ProcessMsg: msg})
 }
 
-func (r *RpcProxy) Close() {
+func (r *rpcProxy) Close() {
 	if r.cancel != nil {
 		r.cancel()
 	}

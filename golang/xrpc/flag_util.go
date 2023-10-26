@@ -12,10 +12,10 @@ import (
 	"reflect"
 )
 
-type FlagType uint16
+type flagType uint16
 
 const (
-	REQ_FLAG       FlagType = 0b1
+	REQ_FLAG       flagType = 0b1
 	CALL_FLAG               = 0b10
 	NODEMSG_FLAG            = 0b100
 	VERIFYMSG_FLAG          = 0b1000
@@ -34,19 +34,19 @@ const (
 	constProcessCastFlag = REQ_FLAG
 )
 
-func BuildFlag(flagList []FlagType) FlagType {
-	var flag FlagType
+func buildFlag(flagList []flagType) flagType {
+	var flag flagType
 	for _, f := range flagList {
 		flag = f ^ flag
 	}
 	return flag
 }
 
-func CheckFlag(flag FlagType, flagType FlagType) bool {
+func checkFlag(flag flagType, flagType flagType) bool {
 	return flag&flagType == flagType
 }
 
-func GetProtoMsg(msg []byte, messageName string) (proto.Message, error) {
+func getProtoMsg(msg []byte, messageName string) (proto.Message, error) {
 	tp := proto.MessageType(messageName)
 	protoMsg := reflect.New(tp.Elem()).Interface().(proto.Message)
 	err := proto.Unmarshal(msg, protoMsg)
@@ -56,7 +56,7 @@ func GetProtoMsg(msg []byte, messageName string) (proto.Message, error) {
 	return protoMsg, nil
 }
 
-func BuildReplyMsg(msg proto.Message, err error) *xgame.ReplyMessage {
+func buildReplyMsg(msg proto.Message, err error) *xgame.ReplyMessage {
 	rst := &xgame.ReplyMessage{}
 	if err != nil {
 		rst.Error = err.Error()
@@ -72,7 +72,7 @@ func BuildReplyMsg(msg proto.Message, err error) *xgame.ReplyMessage {
 	return rst
 }
 
-func BuildRpcParams(pbMsg proto.Message) (*xgame.RpcParams, error) {
+func buildRpcParams(pbMsg proto.Message) (*xgame.RpcParams, error) {
 	payload, err := proto.Marshal(pbMsg)
 	if err != nil {
 		return nil, err
