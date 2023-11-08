@@ -4,13 +4,14 @@
 // @contact   :
 // @time      : 2023/8/14 12:06
 // -------------------------------------------
-package xrpc
+package test
 
 import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/smartystreets/goconvey/convey"
 	"golang/common/utils"
 	xgame "golang/proto"
+	"golang/xrpc"
 	"math/rand"
 	"testing"
 	"time"
@@ -22,12 +23,12 @@ var nodeName = "testnode1@localhost:8000"
 
 func init() {
 	handler = newTestNodeHandler()
-	RegisterNodeMsg("test", handler)
-	err := Start(nodeName, testCookie)
+	xrpc.RegisterNodeMsg("test", handler)
+	err := xrpc.Start(nodeName, testCookie)
 	if err != nil {
 		return
 	}
-	err = Connect(nodeName)
+	err = xrpc.Connect(nodeName)
 	if err != nil {
 		return
 	}
@@ -43,12 +44,32 @@ func newTestNodeHandler() *TestNodeHandler {
 	}
 }
 
-func (t *TestNodeHandler) NodeCall(message proto.Message) (proto.Message, error) {
-	return message, nil
+func (t *TestNodeHandler) HandleCallMsg(reqName string, msg proto.Message) (proto.Message, error) {
+	return xrpc.DispatchTestNodeServiceCallMsg(t, reqName, msg)
 }
 
-func (t *TestNodeHandler) NodeCast(message proto.Message) error {
-	t.msgChan <- message
+func (t *TestNodeHandler) HandleCastMsg(reqName string, msg proto.Message) error {
+	return xrpc.DispatchTestNodeServiceCastMsg(t, reqName, msg)
+}
+
+func (t *TestNodeHandler) GetModuleName() string {
+	return "test"
+}
+
+func (t *TestNodeHandler) OnCallNodeTest(msg *xgame.TestMsg) (*xgame.TestMsg, error) {
+	return msg, nil
+}
+
+func (t *TestNodeHandler) OnCastNodeTest(msg *xgame.TestMsg) error {
+	t.msgChan <- msg
+	return nil
+}
+
+func (t *TestNodeHandler) OnCallNodeGetPidList(list *xgame.ReqGetPidList) (*xgame.ReplyGetPidList, error) {
+	return nil, nil
+}
+
+func (t *TestNodeHandler) OnCastNodeGetPidList(list *xgame.ReqGetPidList) error {
 	return nil
 }
 
@@ -58,18 +79,15 @@ func (t *TestNodeHandler) WaitResponse() proto.Message {
 
 func TestConnect(t *testing.T) {
 	convey.Convey("test connect", t, func() {
-		err := Connect(nodeName)
-		convey.So(err, convey.ShouldNotEqual, nil)
+		err := xrpc.Connect(nodeName)
+		convey.So(err, convey.ShouldEqual, nil)
 	})
 }
 
 func TestNodeCall(t *testing.T) {
 	convey.Convey("test node call", t, func() {
 		reqMsg := &xgame.TestMsg{Msg: "testing", Rand: 123}
-		mfa, err := BuildMfa("test", "NodeCall", reqMsg)
-		convey.So(err, convey.ShouldEqual, nil)
-		convey.So(mfa, convey.ShouldNotEqual, nil)
-		rsp, err := NodeCall(nodeName, mfa, time.Second*5)
+		rsp, err := xrpc.CallNodeTest(nodeName, "test", reqMsg, time.Second*5)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(rsp, convey.ShouldEqual, reqMsg)
 	})
@@ -90,11 +108,7 @@ func BenchmarkNodeCallTest_1000(b *testing.B) {
 func benchNodeCall(b *testing.B, data []byte) {
 	for n := 0; n < b.N; n++ {
 		reqMsg := &xgame.TestMsg{Msg: "testing", TestBt: data, Rand: rand.Int31()}
-		mfa, err := BuildMfa("test", "NodeCall", reqMsg)
-		if err != nil {
-			b.FailNow()
-		}
-		_, err = NodeCall(nodeName, mfa, time.Second*3)
+		_, err := xrpc.CallNodeTest(nodeName, "test", reqMsg, time.Second*5)
 		if err != nil {
 			b.FailNow()
 		}
@@ -109,10 +123,7 @@ func TestNodeBatchCall(t *testing.T) {
 			bm.AddTask(func() {
 				convey.Convey("test call ", t, func() {
 					reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31(), TestBt: randomByte(100)}
-					mfa, err := BuildMfa("test", "NodeCall", reqMsg)
-					convey.So(err, convey.ShouldEqual, nil)
-					convey.So(mfa, convey.ShouldNotEqual, nil)
-					rsp, err := NodeCall(nodeName, mfa, time.Second*3)
+					rsp, err := xrpc.CallNodeTest(nodeName, "test", reqMsg, time.Second*5)
 					convey.So(err, convey.ShouldEqual, nil)
 					convey.So(rsp, convey.ShouldEqual, reqMsg)
 				})
@@ -125,10 +136,7 @@ func TestNodeBatchCall(t *testing.T) {
 func TestNodeCast(t *testing.T) {
 	convey.Convey("test node cast", t, func() {
 		reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31()}
-		mfa, err := BuildMfa("test", "NodeCast", reqMsg)
-		convey.So(err, convey.ShouldEqual, nil)
-		convey.So(mfa, convey.ShouldNotEqual, nil)
-		err = NodeCast(nodeName, mfa)
+		err := xrpc.CastNodeTest(nodeName, "test", reqMsg)
 		convey.So(err, convey.ShouldEqual, nil)
 		convey.So(handler.WaitResponse(), convey.ShouldEqual, reqMsg)
 	})
@@ -142,10 +150,8 @@ func TestNodeSeqCast(t *testing.T) {
 			bm.AddTask(func() {
 				convey.Convey("test cast ", t, func() {
 					reqMsg := &xgame.TestMsg{Msg: "testing", Rand: rand.Int31()}
-					mfa, err := BuildMfa("test", "NodeCast", reqMsg)
+					err := xrpc.CastNodeTest(nodeName, "test", reqMsg)
 					convey.So(err, convey.ShouldEqual, nil)
-					convey.So(mfa, convey.ShouldNotEqual, nil)
-					err = NodeCast(nodeName, mfa)
 				})
 			})
 		}

@@ -1,5 +1,6 @@
 syntax = "proto3";
 package xgame;
+option go_package = "golang.xrpc";
 
 message test_msg {
   string msg = 1;
@@ -8,10 +9,21 @@ message test_msg {
   bytes testBt = 4;
 }
 
-
 message ReqGetPidList {
 }
 
 message ReplyGetPidList {
   repeated bytes pids = 1;
+}
+
+// Type: Actor
+service TestService {
+  rpc Test(test_msg) returns (test_msg);
+  rpc GetPidList(ReqGetPidList) returns (ReplyGetPidList);
+}
+
+//Type: Node
+service TestNodeService {
+  rpc NodeTest(test_msg) returns (test_msg);
+  rpc NodeGetPidList(ReqGetPidList) returns (ReplyGetPidList);
 }
