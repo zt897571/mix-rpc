@@ -164,46 +164,22 @@ func NodeCall(nodeName string, mfa *xgame.PbMfa, timeout time.Duration) (proto.M
 	return proxy.blockCall(constNodeCallFlag, &xgame.ReqMessage{NodeMsg: mfa}, timeout)
 }
 
-var mhMap = make(map[string]map[string]*FuncDesc)
+var gMsgMap = make(map[string]iface2.IProtoMsgHandler)
 
-func RegisterNodeMsg(module string, instance any) {
-	fs := ScanFunction(instance)
-	mp := make(map[string]*FuncDesc)
-	for _, f := range fs {
-		mp[f.Name] = f
+func RegisterNodeMsg(module string, handler iface2.IProtoMsgHandler) {
+	if _, ok := gMsgMap[module]; ok {
+		log.Warnf("module %v already register", module)
 	}
-	mhMap[module] = mp
+	gMsgMap[module] = handler
 }
 
 func applyMfa(mfa *xgame.PbMfa) (proto.Message, error) {
-	var funcMap map[string]*FuncDesc
-	var ok bool
-	if funcMap, ok = mhMap[mfa.Module]; !ok {
-		return nil, error_code.MfaError
-	}
-	if _, ok := funcMap[mfa.Function]; !ok {
-		return nil, error_code.MfaError
+	if _, ok := gMsgMap[mfa.Module]; !ok {
+		return nil, error_code.ModuleNotFound
 	}
 	msg, err := getProtoMsg(mfa.Args.Payload, mfa.Args.MsgName)
 	if err != nil {
 		return nil, err
 	}
-	rst, err := funcMap[mfa.Function].SafeCall(msg)
-	if err != nil {
-		return nil, err
-	}
-	if len(rst) == 0 {
-		return nil, nil
-	}
-	if len(rst) != 2 {
-		return nil, error_code.MfaError
-	}
-	var result proto.Message
-	if rst[0].Interface() != nil {
-		result = rst[0].Interface().(proto.Message)
-	}
-	if rst[1].Interface() != nil {
-		err = rst[1].Interface().(error)
-	}
-	return result, err
+	return gMsgMap[mfa.Module].HandleCallMsg(mfa.Function, msg)
 }

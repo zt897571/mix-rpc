@@ -220,7 +220,6 @@ func getRpcProxy(target iface.IPid) (*rpcProxy, error) {
 	}
 	proxy := gNode.getProxy(nodeName)
 	if proxy == nil {
-
 		return nil, error_code.RpcProxyNotFound
 	}
 	return proxy, nil

@@ -12,7 +12,9 @@ start_erlang:
 	cd erlang2 && rebar3 release && cd _build/default/rel/test/bin && test console
 
 proto:
-	protoc --gogoslick_out=./golang/proto -I=proto ./proto/*.proto
+	#protoc --gogoslick_out=./golang/proto -I=proto ./proto/*.proto
+	#protoc --gogoslick_out=./golang/proto --xrpc_out=./golang/proto -I=proto ./proto/*.proto
+	protoc --gofast_out=./golang/proto -I=proto ./proto/*.proto
 
 test:
 	cd erlang2 && rebar3 ct && cd ../

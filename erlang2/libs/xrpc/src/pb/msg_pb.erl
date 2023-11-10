@@ -703,46 +703,77 @@ enum_value_by_symbol(E, V) -> erlang:error({no_enum_defs, E, V}).
 
 
 
-get_service_names() -> [].
+get_service_names() -> ['xgame.TestService', 'xgame.TestNodeService'].
 
 
+get_service_def('xgame.TestService') ->
+    {{service, 'xgame.TestService'},
+     [#rpc{name = 'Test', input = 'xgame.test_msg', output = 'xgame.test_msg', input_stream = false, output_stream = false, opts = []},
+      #rpc{name = 'GetPidList', input = 'xgame.ReqGetPidList', output = 'xgame.ReplyGetPidList', input_stream = false, output_stream = false, opts = []}]};
+get_service_def('xgame.TestNodeService') ->
+    {{service, 'xgame.TestNodeService'},
+     [#rpc{name = 'NodeTest', input = 'xgame.test_msg', output = 'xgame.test_msg', input_stream = false, output_stream = false, opts = []},
+      #rpc{name = 'NodeGetPidList', input = 'xgame.ReqGetPidList', output = 'xgame.ReplyGetPidList', input_stream = false, output_stream = false, opts = []}]};
 get_service_def(_) -> error.
 
 
+get_rpc_names('xgame.TestService') -> ['Test', 'GetPidList'];
+get_rpc_names('xgame.TestNodeService') -> ['NodeTest', 'NodeGetPidList'];
 get_rpc_names(_) -> error.
 
 
+find_rpc_def('xgame.TestService', RpcName) -> 'find_rpc_def_xgame.TestService'(RpcName);
+find_rpc_def('xgame.TestNodeService', RpcName) -> 'find_rpc_def_xgame.TestNodeService'(RpcName);
 find_rpc_def(_, _) -> error.
 
 
+'find_rpc_def_xgame.TestService'('Test') -> #rpc{name = 'Test', input = 'xgame.test_msg', output = 'xgame.test_msg', input_stream = false, output_stream = false, opts = []};
+'find_rpc_def_xgame.TestService'('GetPidList') -> #rpc{name = 'GetPidList', input = 'xgame.ReqGetPidList', output = 'xgame.ReplyGetPidList', input_stream = false, output_stream = false, opts = []};
+'find_rpc_def_xgame.TestService'(_) -> error.
 
--spec fetch_rpc_def(_, _) -> no_return().
-fetch_rpc_def(ServiceName, RpcName) -> erlang:error({no_such_rpc, ServiceName, RpcName}).
+'find_rpc_def_xgame.TestNodeService'('NodeTest') -> #rpc{name = 'NodeTest', input = 'xgame.test_msg', output = 'xgame.test_msg', input_stream = false, output_stream = false, opts = []};
+'find_rpc_def_xgame.TestNodeService'('NodeGetPidList') -> #rpc{name = 'NodeGetPidList', input = 'xgame.ReqGetPidList', output = 'xgame.ReplyGetPidList', input_stream = false, output_stream = false, opts = []};
+'find_rpc_def_xgame.TestNodeService'(_) -> error.
+
+
+fetch_rpc_def(ServiceName, RpcName) ->
+    case find_rpc_def(ServiceName, RpcName) of
+        Def when is_tuple(Def) -> Def;
+        error -> erlang:error({no_such_rpc, ServiceName, RpcName})
+    end.
 
 
 %% Convert a a fully qualified (ie with package name) service name
 %% as a binary to a service name as an atom.
--spec fqbin_to_service_name(_) -> no_return().
+fqbin_to_service_name(<<"xgame.TestService">>) -> 'xgame.TestService';
+fqbin_to_service_name(<<"xgame.TestNodeService">>) -> 'xgame.TestNodeService';
 fqbin_to_service_name(X) -> error({gpb_error, {badservice, X}}).
 
 
 %% Convert a service name as an atom to a fully qualified
 %% (ie with package name) name as a binary.
--spec service_name_to_fqbin(_) -> no_return().
+service_name_to_fqbin('xgame.TestService') -> <<"xgame.TestService">>;
+service_name_to_fqbin('xgame.TestNodeService') -> <<"xgame.TestNodeService">>;
 service_name_to_fqbin(X) -> error({gpb_error, {badservice, X}}).
 
 
 %% Convert a a fully qualified (ie with package name) service name
 %% and an rpc name, both as binaries to a service name and an rpc
 %% name, as atoms.
--spec fqbins_to_service_and_rpc_name(_, _) -> no_return().
+fqbins_to_service_and_rpc_name(<<"xgame.TestService">>, <<"Test">>) -> {'xgame.TestService', 'Test'};
+fqbins_to_service_and_rpc_name(<<"xgame.TestService">>, <<"GetPidList">>) -> {'xgame.TestService', 'GetPidList'};
+fqbins_to_service_and_rpc_name(<<"xgame.TestNodeService">>, <<"NodeTest">>) -> {'xgame.TestNodeService', 'NodeTest'};
+fqbins_to_service_and_rpc_name(<<"xgame.TestNodeService">>, <<"NodeGetPidList">>) -> {'xgame.TestNodeService', 'NodeGetPidList'};
 fqbins_to_service_and_rpc_name(S, R) -> error({gpb_error, {badservice_or_rpc, {S, R}}}).
 
 
 %% Convert a service name and an rpc name, both as atoms,
 %% to a fully qualified (ie with package name) service name and
 %% an rpc name as binaries.
--spec service_and_rpc_name_to_fqbins(_, _) -> no_return().
+service_and_rpc_name_to_fqbins('xgame.TestService', 'Test') -> {<<"xgame.TestService">>, <<"Test">>};
+service_and_rpc_name_to_fqbins('xgame.TestService', 'GetPidList') -> {<<"xgame.TestService">>, <<"GetPidList">>};
+service_and_rpc_name_to_fqbins('xgame.TestNodeService', 'NodeTest') -> {<<"xgame.TestNodeService">>, <<"NodeTest">>};
+service_and_rpc_name_to_fqbins('xgame.TestNodeService', 'NodeGetPidList') -> {<<"xgame.TestNodeService">>, <<"NodeGetPidList">>};
 service_and_rpc_name_to_fqbins(S, R) -> error({gpb_error, {badservice_or_rpc, {S, R}}}).
 
 
@@ -801,11 +832,11 @@ get_pkg_containment("msg") -> xgame;
 get_pkg_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
-get_service_containment("msg") -> [];
+get_service_containment("msg") -> ['xgame.TestNodeService', 'xgame.TestService'];
 get_service_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
-get_rpc_containment("msg") -> [];
+get_rpc_containment("msg") -> [{'xgame.TestService', 'Test'}, {'xgame.TestService', 'GetPidList'}, {'xgame.TestNodeService', 'NodeTest'}, {'xgame.TestNodeService', 'NodeGetPidList'}];
 get_rpc_containment(P) -> error({gpb_error, {badproto, P}}).
 
 
@@ -819,7 +850,8 @@ get_proto_by_msg_name_as_fqbin(<<"xgame.test_msg">>) -> "msg";
 get_proto_by_msg_name_as_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 
--spec get_proto_by_service_name_as_fqbin(_) -> no_return().
+get_proto_by_service_name_as_fqbin(<<"xgame.TestService">>) -> "msg";
+get_proto_by_service_name_as_fqbin(<<"xgame.TestNodeService">>) -> "msg";
 get_proto_by_service_name_as_fqbin(E) -> error({gpb_error, {badservice, E}}).
 
 

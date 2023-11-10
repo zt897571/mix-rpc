@@ -37,3 +37,9 @@ type IPid interface {
 type IServerDiscovery interface {
 	GetIpAddressByNode(string) (string, error)
 }
+
+// IProtoMsgHandler proto消息处理接口
+type IProtoMsgHandler interface {
+	HandleCallMsg(reqName string, msg proto.Message) (proto.Message, error)
+	HandleCastMsg(reqName string, msg proto.Message) error
+}

@@ -1,11 +1,11 @@
 syntax = "proto3";
 package xgame;
+option go_package = "golang.xrpc";
 
 message process_msg {
   bytes source = 1;  // 调用方
   bytes target = 2;  // 目标对象
   rpc_params params = 3;  //参数
-
 }
 
 message pb_mfa {

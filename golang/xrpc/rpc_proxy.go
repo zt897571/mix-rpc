@@ -153,7 +153,19 @@ func (r *rpcProxy) handleNodeReqMsg(pkg *packet) {
 			err = error_code.MfaError
 			return
 		}
-		rst, err = applyMfa(reqMsg.NodeMsg)
+		if _, ok := gMsgMap[reqMsg.NodeMsg.Module]; !ok {
+			err = error_code.ModuleNotFound
+			return
+		}
+		msg, err := getProtoMsg(reqMsg.NodeMsg.Args.Payload, reqMsg.NodeMsg.Args.MsgName)
+		if err != nil {
+			return
+		}
+		if pkg.isCall() {
+			rst, err = gMsgMap[reqMsg.NodeMsg.Module].HandleCallMsg(reqMsg.NodeMsg.Function, msg)
+		} else {
+			err = gMsgMap[reqMsg.NodeMsg.Module].HandleCastMsg(reqMsg.NodeMsg.Function, msg)
+		}
 	}()
 }
 
@@ -308,6 +320,7 @@ func (r *rpcProxy) Close() {
 	gNode.removeProxy(r)
 }
 
+// todo: zhangtuo function 修改为根据hashid索引
 func BuildMfa(module string, function string, args proto.Message) (*xgame.PbMfa, error) {
 	var argsBin []byte = nil
 	var err error

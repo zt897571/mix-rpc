@@ -9,14 +9,35 @@ package main
 import (
 	"github.com/gogo/protobuf/proto"
 	"golang/common/log"
+	iface2 "golang/iface"
 	xgame "golang/proto"
 	"golang/xrpc"
 )
 
+func init() {
+	nodeCmd := &NodeCmd{}
+	xrpc.RegisterNodeMsg(nodeCmd.GetModuleName(), nodeCmd)
+}
+
 type NodeCmd struct {
 }
 
-func (n *NodeCmd) GetPidList(_ *xgame.ReqGetPidList) (proto.Message, error) {
+var _ xrpc.ITestNodeServiceHandler = (*NodeCmd)(nil)
+var _ iface2.IProtoMsgHandler = (*NodeCmd)(nil)
+
+func (n *NodeCmd) GetModuleName() string {
+	return "NodeCmd"
+}
+
+func (n *NodeCmd) OnCallNodeTest(msg *xgame.TestMsg) (*xgame.TestMsg, error) {
+	return msg, nil
+}
+
+func (n *NodeCmd) OnCastNodeTest(msg *xgame.TestMsg) error {
+	return nil
+}
+
+func (n *NodeCmd) OnCallNodeGetPidList(req *xgame.ReqGetPidList) (*xgame.ReplyGetPidList, error) {
 	pids := xrpc.GetAllPids()
 	if len(pids) == 0 {
 		_, err := xrpc.CreateProcess(&TestActor{})
@@ -33,12 +54,16 @@ func (n *NodeCmd) GetPidList(_ *xgame.ReqGetPidList) (proto.Message, error) {
 	return &xgame.ReplyGetPidList{Pids: pidsBin}, nil
 }
 
-func (n *NodeCmd) TestNodeCall(msg *xgame.TestMsg) (proto.Message, error) {
-	log.Infof("recevie node call = %v\n ", msg)
-	return msg, nil
+func (n *NodeCmd) OnCastNodeGetPidList(list *xgame.ReqGetPidList) error {
+	return nil
 }
 
-func (n *NodeCmd) TestNodeCast(msg *xgame.TestMsg) error {
-	log.Infof("recevie node cast = %v\n ", msg)
-	return nil
+func (n *NodeCmd) HandleCallMsg(reqName string, msg proto.Message) (proto.Message, error) {
+	log.Infof("receive call msg %s", reqName)
+	return xrpc.DispatchTestNodeServiceCallMsg(n, reqName, msg)
+}
+
+func (n *NodeCmd) HandleCastMsg(reqName string, msg proto.Message) error {
+	log.Infof("receive cast msg %s", reqName)
+	return xrpc.DispatchTestNodeServiceCastMsg(n, reqName, msg)
 }

@@ -184,10 +184,10 @@ handle_actor_req(Flag, Seq, BinData, #state{socket = Socket, transport = Transpo
         true ->
           case packet_util:check_flag(Flag, ?CALL_FLAG) of
             false ->
-              gen_server:cast(TargetPid, {go_msg, Msg}),
+              gen_server:cast(TargetPid, {xrpc, Msg}),
               ignore;
             true ->
-              {ok, Rst} = gen_server:call(TargetPid, {go_msg, FromPid, Msg}),
+              {ok, Rst} = gen_server:call(TargetPid, {xrpc, FromPid, Msg}),
               packet_util:encode_reply_msg(Rst)
           end
       end
@@ -208,8 +208,9 @@ log(Format, Args) ->
 run_pbmfa(Binary) when is_binary(Binary) ->
   try
     {ok, M, F, A} = packet_util:decode_mfa(Binary),
+    F2 = func_name_index:get_function_name(F),
     log("run mfa = ~p ~p ~p~n", [M, F, A]),
-    apply(M, F, [A])
+    apply(M, F2, [A])
   catch
     Error ->
       log("run mfa err = ~p~n", Error),
@@ -217,3 +218,4 @@ run_pbmfa(Binary) when is_binary(Binary) ->
   end;
 run_pbmfa(_) ->
   ?ERROR_MFA_ARGS.
+
