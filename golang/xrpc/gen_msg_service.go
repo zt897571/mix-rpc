@@ -6,6 +6,7 @@ package xrpc
 
 import (
 	"github.com/gogo/protobuf/proto"
+	"golang/common/log"
 	"golang/error_code"
 	"golang/iface"
 	xgame "golang/proto"
@@ -143,7 +144,7 @@ func DispatchTestNodeServiceCallMsg(handler ITestNodeServiceHandler, msgName str
 	case "OnCallNodeGetPidList":
 		return handler.OnCallNodeGetPidList(msg.(*xgame.ReqGetPidList))
 	}
-	log.Error("DispatchTestNodeServiceCallMsg not found msgName:%s", msgName)
+	log.Errorf("DispatchTestNodeServiceCallMsg not found msgName:%s", msgName)
 	return nil, error_code.MsgHandlerNotFound
 }
 
@@ -154,6 +155,6 @@ func DispatchTestNodeServiceCastMsg(handler ITestNodeServiceHandler, msgName str
 	case "OnCastNodeGetPidList":
 		return handler.OnCastNodeGetPidList(msg.(*xgame.ReqGetPidList))
 	}
-	log.Error("DispatchTestNodeServiceCallMsg not found msgName:%s", msgName)
+	log.Errorf("DispatchTestNodeServiceCallMsg not found msgName:%s", msgName)
 	return error_code.MsgHandlerNotFound
 }

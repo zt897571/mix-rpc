@@ -64,7 +64,6 @@ test_node(TargetNode) ->
   {ok, #'xgame.ReplyGetPidList'{pids = Pids}} = test_node_service:call_node_get_pid_list(Node, "NodeCmd", #'xgame.ReqGetPidList'{}, 5000),
   Pid = hd(Pids),
   ok = test_node_service:cast_node_test(Node, "NodeCmd", #'xgame.test_msg'{}),
-  ok = xrpc:node_cast(Node, test, "TestNodeCast", #'xgame.test_msg'{msg = "testMsg"}),
   TestMsg = #'xgame.test_msg'{msg = "testMsg"},
   {ok, TestMsg} = xrpc:actor_call(Pid, TestMsg, 5000),
   ok = xrpc:actor_cast(Pid, TestMsg).

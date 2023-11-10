@@ -6,6 +6,7 @@ package xrpc
 
 import (
      "github.com/gogo/protobuf/proto"
+	 "golang/common/log"
 	 "golang/error_code"
      "golang/iface"
      xgame "golang/proto"
@@ -104,7 +105,7 @@ func Dispatch{{$service.Name}}CallMsg(handler I{{$service.Name}}Handler, msgName
         return handler.OnCall{{.Name}}(msg.(*{{.InputType}}))
     {{- end}}
     }
-    log.Error("Dispatch{{$service.Name}}CallMsg not found msgName:%s", msgName)
+    log.Errorf("Dispatch{{$service.Name}}CallMsg not found msgName:%s", msgName)
     return nil, error_code.MsgHandlerNotFound
 }
 
@@ -115,7 +116,7 @@ func Dispatch{{$service.Name}}CastMsg(handler I{{$service.Name}}Handler, msgName
         return handler.OnCast{{.Name}}(msg.(*{{.InputType}}))
     {{- end}}
     }
-    log.Error("Dispatch{{$service.Name}}CallMsg not found msgName:%s", msgName)
+    log.Errorf("Dispatch{{$service.Name}}CallMsg not found msgName:%s", msgName)
     return error_code.MsgHandlerNotFound
 }
 
