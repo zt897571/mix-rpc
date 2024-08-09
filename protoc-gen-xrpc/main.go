@@ -20,7 +20,8 @@ var erlTargetPath = "./erlang2/libs/xrpc/src/gen"
 var golangTargetPath = "./golang/xrpc"
 
 func main() {
-
+	initLog()
+	log("proto gen xrpc start")
 	protogen.Options{}.Run(func(gen *protogen.Plugin) error {
 		for _, file := range gen.Files {
 			if !file.Generate {
@@ -36,6 +37,7 @@ func generateFile(file *protogen.File) {
 	if len(file.Services) == 0 {
 		return
 	}
+	file.Desc
 
 	var services []*ServiceDesc
 	for _, svr := range file.Services {
@@ -139,4 +141,23 @@ func convertToUnderLineCase(s string) string {
 	}
 	sp = append(sp, strings.ToLower(s[lastUpKey:]))
 	return strings.Join(sp, "_")
+}
+
+var gLogFp *os.File
+
+func initLog() {
+	logFp, err := os.Create("./xrpc.log")
+	if err != nil {
+		return
+	}
+	gLogFp = logFp
+}
+
+func log(msg string) {
+	gLogFp.WriteString(msg + "\n")
+	gLogFp.Sync()
+}
+
+func logf(fm string, args ...any) {
+	log(fmt.Sprintf(fm, args...))
 }

@@ -2,12 +2,7 @@ syntax = "proto3";
 package xgame;
 option go_package = "golang.xrpc";
 
-message test_msg {
-  string msg = 1;
-  int32 delayTime = 2;  // 延迟时间秒
-  int32 rand = 3;
-  bytes testBt = 4;
-}
+
 
 message ReqGetPidList {
 }
