@@ -37,8 +37,6 @@ func generateFile(file *protogen.File) {
 	if len(file.Services) == 0 {
 		return
 	}
-	file.Desc
-
 	var services []*ServiceDesc
 	for _, svr := range file.Services {
 		var methods []*MethodDesc
